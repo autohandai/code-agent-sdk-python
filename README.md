@@ -6,9 +6,11 @@
 
 A production-grade Python SDK for the Autohand CLI, enabling programmatic control of code agents through a high-level async API over the CLI's JSON-RPC mode.
 
-## Other SDKs
+**Beta:** this SDK is actively evolving while the Agent SDK APIs stabilize. Pin versions in production and review release notes before upgrading.
 
-Use the same CLI-backed SDK model from another language:
+## Other Programming Languages (Beta)
+
+The Agent SDK is available in multiple beta language packages. Use the same CLI-backed SDK model from another programming language:
 
 - [TypeScript](https://github.com/autohandai/code-agent-sdk-typescript) - `Agent`, `Run`, streaming, and JSON helpers for Node and Bun hosts.
 - [Go](https://github.com/autohandai/code-agent-sdk-go) - idiomatic Go package with `context.Context`, typed events, and channel-based streaming.
