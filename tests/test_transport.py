@@ -335,13 +335,22 @@ class TestTransportStartArguments:
                 unrestricted=True,
                 auto_mode=True,
                 auto_skill=True,
+                auto_commit=True,
+                bare=True,
+                idle_logout=False,
                 model="fantail",
                 temperature=0.4,
                 max_iterations=5,
                 max_runtime=10,
                 max_cost=1.25,
                 sys_prompt="system",
+                system_prompt_file="system.md",
                 append_sys_prompt="append",
+                append_system_prompt_file="append.md",
+                display_language="en-NZ",
+                mcp_config="mcp.json",
+                agents="./agents",
+                plugin_dir="./plugins",
                 yolo="git status",
                 yolo_timeout=30,
                 add_dir=["../shared"],
@@ -356,8 +365,13 @@ class TestTransportStartArguments:
                 session_id="session-1",
                 resume=True,
                 continue_session=True,
+                fork="session-parent",
                 session_path=".autohand/session.json",
                 auto_save_interval=60,
+                agents_md_enable=True,
+                agents_md_create=True,
+                agents_md_path="AGENTS.md",
+                agents_md_auto_update=True,
                 context_compact=True,
                 max_tokens=1000,
                 compression_threshold=0.7,
@@ -390,6 +404,43 @@ class TestTransportStartArguments:
         assert "--unrestricted" in argv
         assert "--auto-mode" in argv
         assert "--auto-skill" in argv
+        assert "--bare" in argv
+        assert "-c" in argv
+        assert "--no-idle-logout" in argv
+        assert argv[argv.index("--fork") : argv.index("--fork") + 2] == [
+            "--fork",
+            "session-parent",
+        ]
+        assert "--agents-md" in argv
+        assert "--agents-md-create" in argv
+        assert "--agents-md-auto-update" in argv
+        assert argv[argv.index("--agents-md-path") : argv.index("--agents-md-path") + 2] == [
+            "--agents-md-path",
+            "AGENTS.md",
+        ]
+        assert argv[argv.index("--display-language") : argv.index("--display-language") + 2] == [
+            "--display-language",
+            "en-NZ",
+        ]
+        assert argv[argv.index("--system-prompt-file") : argv.index("--system-prompt-file") + 2] == [
+            "--system-prompt-file",
+            "system.md",
+        ]
+        assert argv[
+            argv.index("--append-system-prompt-file") : argv.index("--append-system-prompt-file") + 2
+        ] == ["--append-system-prompt-file", "append.md"]
+        assert argv[argv.index("--mcp-config") : argv.index("--mcp-config") + 2] == [
+            "--mcp-config",
+            "mcp.json",
+        ]
+        assert argv[argv.index("--agents") : argv.index("--agents") + 2] == [
+            "--agents",
+            "./agents",
+        ]
+        assert argv[argv.index("--plugin-dir") : argv.index("--plugin-dir") + 2] == [
+            "--plugin-dir",
+            "./plugins",
+        ]
         assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "fantail"]
         assert argv[argv.index("--skills") : argv.index("--skills") + 2] == ["--skills", "typescript"]
         assert "--custom" in argv

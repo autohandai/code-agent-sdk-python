@@ -30,6 +30,13 @@ RPC_METHODS = {
     "set_model": "autohand.modelSet",
     "apply_flag_settings": "autohand.applyFlagSettings",
     "get_account_info": "autohand.getAccountInfo",
+    "goal_get": "autohand.goal.get",
+    "goal_create": "autohand.goal.create",
+    "goal_update": "autohand.goal.update",
+    "goal_clear": "autohand.goal.clear",
+    "goal_queue": "autohand.goal.queue",
+    "goal_start_queued": "autohand.goal.startQueued",
+    "goal_list_templates": "autohand.goal.listTemplates",
     "autoresearch_start": "autohand.autoresearch.start",
     "autoresearch_status": "autohand.autoresearch.status",
     "autoresearch_stop": "autohand.autoresearch.stop",
@@ -242,6 +249,13 @@ class RPCClient:
             ),
         )
 
+    async def apply_flag_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Merge settings into the CLI flag-settings layer."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["apply_flag_settings"], {"settings": settings}),
+        )
+
     async def get_account_info(self) -> dict[str, Any]:
         """Get account info."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_account_info"], {}))
@@ -252,6 +266,37 @@ class RPCClient:
         The current CLI does not expose a dedicated save-session RPC method.
         """
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_state"], {}))
+
+    async def get_goal(self) -> dict[str, Any]:
+        """Get the persistent-goal snapshot."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_get"], {}))
+
+    async def create_goal(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Create a persistent goal."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_create"], params))
+
+    async def update_goal(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Update the active persistent goal."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_update"], params))
+
+    async def clear_goal(self) -> dict[str, Any]:
+        """Clear the active persistent goal."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_clear"], {}))
+
+    async def queue_goal(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Queue a persistent goal."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_queue"], params))
+
+    async def start_queued_goal(self) -> dict[str, Any]:
+        """Start the next queued persistent goal."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["goal_start_queued"], {}))
+
+    async def list_goal_templates(self) -> dict[str, Any] | list[dict[str, Any]]:
+        """List available persistent-goal templates."""
+        return cast(
+            dict[str, Any] | list[dict[str, Any]],
+            await self._request(RPC_METHODS["goal_list_templates"], {}),
+        )
 
     async def start_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
         """Initialize or resume an autoresearch session."""
@@ -313,13 +358,22 @@ class RPCClient:
             auto_mode=self.config.auto_mode,
             unrestricted=self.config.unrestricted,
             auto_skill=self.config.auto_skill,
+            auto_commit=self.config.auto_commit,
+            bare=self.config.bare,
+            idle_logout=self.config.idle_logout,
             model=self.config.model,
             temperature=self.config.temperature,
             max_iterations=self.config.max_iterations,
             max_runtime=self.config.max_runtime,
             max_cost=self.config.max_cost,
             sys_prompt=self.config.sys_prompt,
+            system_prompt_file=self.config.system_prompt_file,
             append_sys_prompt=self.config.append_sys_prompt,
+            append_system_prompt_file=self.config.append_system_prompt_file,
+            display_language=self.config.display_language,
+            mcp_config=self.config.mcp_config,
+            agents=self.config.agents,
+            plugin_dir=self.config.plugin_dir,
             yolo=self.config.yolo,
             yolo_timeout=self.config.yolo_timeout,
             add_dir=self._merge_lists(self.config.add_dir, self.config.additional_directories),
@@ -329,6 +383,7 @@ class RPCClient:
             session_id=self.config.session_id,
             resume=self.config.resume,
             continue_session=self.config.continue_,
+            fork=self.config.fork,
             context_compact=self.config.context_compact,
             copy_skill_files=self.config.copy_skill_files,
             provider=self.config.provider.value if self.config.provider else None,
@@ -355,6 +410,16 @@ class RPCClient:
             opts.max_tokens = self.config.context.max_tokens
             opts.compression_threshold = self.config.context.compression_threshold
             opts.summarization_threshold = self.config.context.summarization_threshold
+
+        opts.agents_md_enable = self.config.agents_md_enable
+        opts.agents_md_create = self.config.agents_md_create
+        if self.config.agents_md:
+            if self.config.agents_md.enable is not None:
+                opts.agents_md_enable = self.config.agents_md.enable
+            if self.config.agents_md.create is not None:
+                opts.agents_md_create = self.config.agents_md.create
+            opts.agents_md_path = self.config.agents_md.path
+            opts.agents_md_auto_update = self.config.agents_md.auto_update
 
         if self.config.permissions:
             opts.permission_mode = self.config.permissions.mode

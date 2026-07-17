@@ -1,0 +1,91 @@
+"""Tests for the high-level Agent facade."""
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from autohand_sdk import Agent, AutohandSDK, UpdateGoalParams
+from autohand_sdk.types import PromptResult
+
+
+@pytest.mark.asyncio
+async def test_create_starts_and_close_stops_sdk() -> None:
+    """Agent.create owns SDK startup and close delegates shutdown."""
+    with patch("autohand_sdk.agent.AutohandSDK") as sdk_class:
+        sdk = MagicMock(spec=AutohandSDK)
+        sdk.start = AsyncMock()
+        sdk.close = AsyncMock()
+        sdk_class.return_value = sdk
+
+        agent = await Agent.create(cwd=".")
+        await agent.close()
+
+    sdk_class.assert_called_once_with(None, cwd=".")
+    sdk.start.assert_awaited_once()
+    sdk.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_command_and_capability_helpers_delegate() -> None:
+    """Command execution and capability checks delegate to the SDK."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.command = AsyncMock(return_value=PromptResult(content="command"))
+    sdk.deep_research = AsyncMock(return_value=PromptResult(content="deep"))
+    sdk.autoresearch = AsyncMock(return_value=PromptResult(content="auto"))
+    sdk.supported_commands = AsyncMock(return_value=["/deep-research", "/autoresearch"])
+    sdk.supports_command = AsyncMock(return_value=True)
+    agent = Agent.from_sdk(sdk)
+
+    command = await agent.command("review", ["src", "tests"])
+    deep = await agent.deep_research("architecture")
+    auto = await agent.autoresearch("latency")
+    commands = await agent.supported_commands()
+    supported = await agent.supports_command("autoresearch")
+
+    assert command.content == "command"
+    assert deep.content == "deep"
+    assert auto.content == "auto"
+    assert commands == ["/deep-research", "/autoresearch"]
+    assert supported is True
+    sdk.command.assert_awaited_once_with("review", ["src", "tests"])
+    sdk.deep_research.assert_awaited_once_with("architecture")
+    sdk.autoresearch.assert_awaited_once_with("latency")
+
+
+@pytest.mark.asyncio
+async def test_all_persistent_goal_helpers_delegate() -> None:
+    """All seven persistent-goal operations are exposed by Agent."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.get_goal = AsyncMock(return_value="snapshot")
+    sdk.create_goal = AsyncMock(return_value="created")
+    sdk.update_goal = AsyncMock(return_value="updated")
+    sdk.clear_goal = AsyncMock(return_value="cleared")
+    sdk.queue_goal = AsyncMock(return_value="queued")
+    sdk.start_queued_goal = AsyncMock(return_value="started")
+    sdk.list_goal_templates = AsyncMock(return_value=[])
+    agent = Agent.from_sdk(sdk)
+    update = UpdateGoalParams(status="paused")
+
+    assert await agent.get_goal() == "snapshot"
+    assert await agent.create_goal("ship", token_budget=1000) == "created"
+    assert await agent.update_goal(update) == "updated"
+    assert await agent.clear_goal() == "cleared"
+    assert await agent.queue_goal("document", time_budget_seconds=60) == "queued"
+    assert await agent.start_queued_goal() == "started"
+    assert await agent.list_goal_templates() == []
+    sdk.create_goal.assert_awaited_once_with(
+        "ship",
+        token_budget=1000,
+        time_budget_seconds=None,
+        min_tokens_before_wrap_up=None,
+        min_time_seconds_before_wrap_up=None,
+    )
+    sdk.update_goal.assert_awaited_once_with(update)
+    sdk.queue_goal.assert_awaited_once_with(
+        "document",
+        token_budget=None,
+        time_budget_seconds=60,
+        min_tokens_before_wrap_up=None,
+        min_time_seconds_before_wrap_up=None,
+    )

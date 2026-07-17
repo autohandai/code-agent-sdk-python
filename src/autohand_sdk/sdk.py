@@ -30,15 +30,26 @@ from autohand_sdk.types import (
     AutoresearchStatusResult,
     AutoresearchStopResult,
     AutoresearchSubagentOptions,
+    CreateGoalParams,
+    FeatureFlagSettings,
     GetMessagesParams,
     GetMessagesResult,
     GetStateParams,
     GetStateResult,
+    GoalFeatureDisabledResult,
+    GoalMutationResult,
+    GoalMutationRPCResult,
+    GoalSnapshot,
+    GoalSnapshotResult,
+    GoalTemplateMetadata,
+    GoalTemplatesResult,
     PermissionResponseParams,
     PromptParams,
+    PromptResult,
     SDKConfig,
     SDKEvent,
     SkillReference,
+    UpdateGoalParams,
 )
 
 logger = logging.getLogger(__name__)
@@ -119,6 +130,15 @@ class AutohandSDK:
             self._client = RPCClient(self._config)
 
         await self._client.start()
+        if self._config.features is not None:
+            await self._client.apply_flag_settings(
+                {
+                    "features": self._config.features.model_dump(
+                        by_alias=True,
+                        exclude_none=True,
+                    )
+                }
+            )
         self._started = True
 
     async def stop(self) -> None:
@@ -278,6 +298,61 @@ class AutohandSDK:
         agents = result.get("agents", result.get("commands", []))
         return cast(list[dict[str, Any]], agents)
 
+    async def supported_commands(self) -> list[str]:
+        """Return CLI slash commands normalized with a leading slash."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        result = await self._client.get_agents()
+        raw_commands = result.get("commands", [])
+        if not isinstance(raw_commands, list):
+            return []
+        return [
+            command if command.startswith("/") else f"/{command}"
+            for command in raw_commands
+            if isinstance(command, str)
+        ]
+
+    async def supports_command(self, command: str) -> bool:
+        """Return whether the current CLI exposes a slash command."""
+        normalized = command if command.startswith("/") else f"/{command}"
+        return normalized in await self.supported_commands()
+
+    def stream_command(
+        self,
+        command: str,
+        args: str | list[str] | tuple[str, ...] | None = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[SDKEvent]:
+        """Stream a CLI slash command through the normal prompt channel."""
+        return self.stream_prompt(self._format_slash_command(command, args), **kwargs)
+
+    async def command(
+        self,
+        command: str,
+        args: str | list[str] | tuple[str, ...] | None = None,
+        **kwargs: Any,
+    ) -> PromptResult:
+        """Run a CLI slash command to completion."""
+        content = ""
+        message_id: str | None = None
+        async for event in self.stream_command(command, args, **kwargs):
+            if event.get("type") == "message_update":
+                content += str(event.get("delta", ""))
+            elif event.get("type") == "message_end":
+                content = str(event.get("content", content))
+                raw_message_id = event.get("message_id", event.get("messageId"))
+                message_id = str(raw_message_id) if raw_message_id is not None else None
+        return PromptResult(message_id=message_id, content=content)
+
+    async def deep_research(self, topic: str, **kwargs: Any) -> PromptResult:
+        """Run the CLI's ``/deep-research`` command."""
+        return await self.command("/deep-research", topic, **kwargs)
+
+    async def autoresearch(self, objective: str, **kwargs: Any) -> PromptResult:
+        """Run the CLI's ``/autoresearch`` slash command."""
+        return await self.command("/autoresearch", objective, **kwargs)
+
     async def set_model(self, model: str) -> dict[str, Any]:
         """Set the model.
 
@@ -326,6 +401,23 @@ class AutohandSDK:
 
         return await self._client.set_temperature(temperature)
 
+    async def apply_flag_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Merge public runtime settings into the CLI flag-settings layer."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.apply_flag_settings(settings)
+
+    async def apply_feature_settings(
+        self,
+        settings: FeatureFlagSettings,
+    ) -> dict[str, Any]:
+        """Apply current CLI feature settings at runtime."""
+        result = await self.apply_flag_settings(
+            {"features": settings.model_dump(by_alias=True, exclude_none=True)}
+        )
+        self._config = self._config.model_copy(update={"features": settings})
+        return result
+
     async def get_account_info(self) -> dict[str, Any]:
         """Get account information.
 
@@ -347,6 +439,108 @@ class AutohandSDK:
             raise RuntimeError("SDK not started")
 
         return await self._client.save_session()
+
+    async def get_goal(self) -> GoalSnapshotResult:
+        """Get the active persistent goal, queue, and completed goals."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        result = await self._client.get_goal()
+        if result.get("ok") is False:
+            return GoalFeatureDisabledResult.model_validate(result)
+        return GoalSnapshot.model_validate(result)
+
+    async def create_goal(
+        self,
+        objective: str,
+        *,
+        token_budget: int | None = None,
+        time_budget_seconds: int | None = None,
+        min_tokens_before_wrap_up: int | None = None,
+        min_time_seconds_before_wrap_up: int | None = None,
+    ) -> GoalMutationRPCResult:
+        """Create a persistent goal with optional token and time budgets."""
+        params = CreateGoalParams(
+            objective=objective,
+            token_budget=token_budget,
+            time_budget_seconds=time_budget_seconds,
+            min_tokens_before_wrap_up=min_tokens_before_wrap_up,
+            min_time_seconds_before_wrap_up=min_time_seconds_before_wrap_up,
+        )
+        return await self._goal_mutation("create_goal", params.model_dump(by_alias=True, exclude_none=True))
+
+    async def update_goal(self, params: UpdateGoalParams) -> GoalMutationRPCResult:
+        """Update fields on the active persistent goal."""
+        return await self._goal_mutation(
+            "update_goal",
+            params.model_dump(by_alias=True, exclude_unset=True),
+        )
+
+    async def clear_goal(self) -> GoalMutationRPCResult:
+        """Clear the active persistent goal."""
+        return await self._goal_mutation("clear_goal")
+
+    async def queue_goal(
+        self,
+        objective: str,
+        *,
+        token_budget: int | None = None,
+        time_budget_seconds: int | None = None,
+        min_tokens_before_wrap_up: int | None = None,
+        min_time_seconds_before_wrap_up: int | None = None,
+    ) -> GoalMutationRPCResult:
+        """Queue a persistent goal to run after the active goal."""
+        params = CreateGoalParams(
+            objective=objective,
+            token_budget=token_budget,
+            time_budget_seconds=time_budget_seconds,
+            min_tokens_before_wrap_up=min_tokens_before_wrap_up,
+            min_time_seconds_before_wrap_up=min_time_seconds_before_wrap_up,
+        )
+        return await self._goal_mutation("queue_goal", params.model_dump(by_alias=True, exclude_none=True))
+
+    async def start_queued_goal(self) -> GoalMutationRPCResult:
+        """Start the next queued persistent goal."""
+        return await self._goal_mutation("start_queued_goal")
+
+    async def list_goal_templates(self) -> GoalTemplatesResult:
+        """List available persistent-goal templates."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        result = await self._client.list_goal_templates()
+        if isinstance(result, dict):
+            return GoalFeatureDisabledResult.model_validate(result)
+        return [GoalTemplateMetadata.model_validate(template) for template in result]
+
+    async def _goal_mutation(
+        self,
+        method: str,
+        params: dict[str, Any] | None = None,
+    ) -> GoalMutationRPCResult:
+        """Call and validate a persistent-goal mutation RPC."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        client_method = getattr(self._client, method)
+        result = await client_method(params) if params is not None else await client_method()
+        if result.get("ok") is False:
+            return GoalFeatureDisabledResult.model_validate(result)
+        return GoalMutationResult.model_validate(result)
+
+    @staticmethod
+    def _format_slash_command(
+        command: str,
+        args: str | list[str] | tuple[str, ...] | None = None,
+    ) -> str:
+        """Normalize a slash command and optional arguments."""
+        normalized = command.strip()
+        if not normalized:
+            raise ValueError("command must not be empty")
+        if not normalized.startswith("/"):
+            normalized = f"/{normalized}"
+        if args is None:
+            return normalized
+        arg_text = " ".join(args) if isinstance(args, (list, tuple)) else args
+        arg_text = arg_text.strip()
+        return f"{normalized} {arg_text}" if arg_text else normalized
 
     async def start_autoresearch(  # noqa: PLR0913 - public RPC options remain explicit and typed
         self,

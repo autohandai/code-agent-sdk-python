@@ -36,13 +36,22 @@ class TransportOptions:
     auto_mode: bool | None = None
     unrestricted: bool | None = None
     auto_skill: bool | None = None
+    auto_commit: bool | None = None
+    bare: bool | None = None
+    idle_logout: bool | None = None
     model: str | None = None
     temperature: float | None = None
     max_iterations: int | None = None
     max_runtime: int | None = None
     max_cost: float | None = None
     sys_prompt: str | None = None
+    system_prompt_file: str | None = None
     append_sys_prompt: str | None = None
+    append_system_prompt_file: str | None = None
+    display_language: str | None = None
+    mcp_config: str | None = None
+    agents: str | None = None
+    plugin_dir: str | None = None
     yolo: str | None = None
     yolo_timeout: int | None = None
     add_dir: list[str] = field(default_factory=list)
@@ -58,12 +67,17 @@ class TransportOptions:
     session_id: str | None = None
     resume: bool | None = None
     continue_session: bool | None = None
+    fork: str | None = None
     session_path: str | None = None
     auto_save_interval: int | None = None
     context_compact: bool | None = None
     max_tokens: int | None = None
     compression_threshold: float | None = None
     summarization_threshold: float | None = None
+    agents_md_enable: bool | None = None
+    agents_md_create: bool | None = None
+    agents_md_path: str | None = None
+    agents_md_auto_update: bool | None = None
     copy_skill_files: bool = True
     provider: str | None = None
     api_key: str | None = None
@@ -98,12 +112,18 @@ class Transport:
             await self._copy_skill_files(cwd)
 
         args = [cli_path, "--mode", "rpc"]
+        if self.options.bare:
+            args.append("--bare")
         if self.options.unrestricted:
             args.append("--unrestricted")
         if self.options.auto_mode:
             args.append("--auto-mode")
         if self.options.auto_skill:
             args.append("--auto-skill")
+        if self.options.auto_commit:
+            args.append("-c")
+        if self.options.idle_logout is False:
+            args.append("--no-idle-logout")
         if self.options.context_compact is False:
             args.append("--no-context-compact")
         elif self.options.context_compact is True:
@@ -116,10 +136,22 @@ class Transport:
             args.append("--resume")
         if self.options.continue_session:
             args.append("--continue")
+        if self.options.fork:
+            args.extend(["--fork", self.options.fork])
         if self.options.session_path:
             args.extend(["--session-path", self.options.session_path])
         if self.options.auto_save_interval is not None:
             args.extend(["--auto-save-interval", str(self.options.auto_save_interval)])
+        if self.options.agents_md_enable is False:
+            args.append("--no-agents-md")
+        elif self.options.agents_md_enable is True:
+            args.append("--agents-md")
+        if self.options.agents_md_create:
+            args.append("--agents-md-create")
+        if self.options.agents_md_path:
+            args.extend(["--agents-md-path", self.options.agents_md_path])
+        if self.options.agents_md_auto_update:
+            args.append("--agents-md-auto-update")
         if self.options.max_tokens is not None:
             args.extend(["--max-tokens", str(self.options.max_tokens)])
         if self.options.compression_threshold is not None:
@@ -144,10 +176,22 @@ class Transport:
             args.extend(["--max-runtime", str(self.options.max_runtime)])
         if self.options.max_cost is not None:
             args.extend(["--max-cost", str(self.options.max_cost)])
+        if self.options.display_language:
+            args.extend(["--display-language", self.options.display_language])
         if self.options.sys_prompt:
             args.extend(["--sys-prompt", self.options.sys_prompt])
+        if self.options.system_prompt_file:
+            args.extend(["--system-prompt-file", self.options.system_prompt_file])
         if self.options.append_sys_prompt:
             args.extend(["--append-sys-prompt", self.options.append_sys_prompt])
+        if self.options.append_system_prompt_file:
+            args.extend(["--append-system-prompt-file", self.options.append_system_prompt_file])
+        if self.options.mcp_config:
+            args.extend(["--mcp-config", self.options.mcp_config])
+        if self.options.agents:
+            args.extend(["--agents", self.options.agents])
+        if self.options.plugin_dir:
+            args.extend(["--plugin-dir", self.options.plugin_dir])
         if self.options.model:
             args.extend(["--model", self.options.model])
         if self.options.temperature is not None:

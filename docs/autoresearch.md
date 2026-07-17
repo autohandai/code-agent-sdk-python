@@ -5,6 +5,11 @@ Pydantic models and the same JSON-RPC methods as the TypeScript v1.0.3 SDK. A
 session proposes focused changes, measures them repeatedly, applies deterministic
 constraints and decision policy, and persists an immutable ledger under `.auto/`.
 
+For a command-style run, use `await sdk.autoresearch(objective)`. This sends
+`/autoresearch <objective>` through the normal prompt channel and returns a
+`PromptResult`. Use `start_autoresearch` and the other typed methods below when
+the application needs direct control over the persisted experiment ledger.
+
 ## Requirements
 
 - A current Autohand CLI binary with autoresearch RPC support.

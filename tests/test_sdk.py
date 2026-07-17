@@ -6,7 +6,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from autohand_sdk import AutohandSDK
-from autohand_sdk.types import AutoresearchStartResult, SDKConfig
+from autohand_sdk.types import (
+    AutoresearchStartResult,
+    FeatureFlagSettings,
+    GoalFeatureDisabledResult,
+    GoalMutationResult,
+    GoalSnapshot,
+    SDKConfig,
+    UpdateGoalParams,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -94,6 +102,26 @@ class TestSDKLifecycle:
             await sdk.start()
             mock_instance.start.assert_called_once()
             assert sdk._started
+
+    @pytest.mark.asyncio
+    async def test_start_applies_feature_settings(self) -> None:
+        with patch("autohand_sdk.sdk.RPCClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client_class.return_value = mock_client
+            sdk = AutohandSDK(
+                features=FeatureFlagSettings(
+                    slash_goal=True,
+                    experimental_fork=True,
+                )
+            )
+
+            await sdk.start()
+
+        mock_client.start.assert_awaited_once()
+        mock_client.apply_flag_settings.assert_awaited_once_with(
+            {"features": {"slashGoal": True, "experimentalFork": True}}
+        )
+        assert sdk._started
 
     @pytest.mark.asyncio
     async def test_start_already_started(self) -> None:
@@ -253,6 +281,48 @@ class TestSDKMethods:
             assert result == []
 
     @pytest.mark.asyncio
+    async def test_command_capability_and_run_helpers(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+
+        async def prompt_events(params):
+            assert params["message"] == "/deep-research SDK parity"
+            yield {"type": "message_update", "delta": "partial"}
+            yield {"type": "message_end", "messageId": "m1", "content": "done"}
+
+        with (
+            patch.object(
+                sdk._client,
+                "get_agents",
+                new_callable=AsyncMock,
+                return_value={"commands": ["deep-research", "/autoresearch"]},
+            ),
+            patch.object(sdk._client, "prompt", side_effect=prompt_events),
+        ):
+            assert await sdk.supported_commands() == ["/deep-research", "/autoresearch"]
+            assert await sdk.supports_command("deep-research") is True
+            result = await sdk.deep_research("SDK parity")
+
+        assert result.message_id == "m1"
+        assert result.content == "done"
+
+    @pytest.mark.asyncio
+    async def test_autoresearch_command_formats_list_arguments(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        messages: list[str] = []
+
+        async def prompt_events(params):
+            messages.append(params["message"])
+            yield {"type": "message_end", "content": "started"}
+
+        with patch.object(sdk._client, "prompt", side_effect=prompt_events):
+            result = await sdk.command("autoresearch", ["improve", "latency"])
+
+        assert messages == ["/autoresearch improve latency"]
+        assert result.content == "started"
+
+    @pytest.mark.asyncio
     async def test_set_model_not_started(self) -> None:
         sdk = AutohandSDK()
         sdk._client = None
@@ -286,6 +356,23 @@ class TestSDKMethods:
             assert sdk.config.temperature == 0.5
 
     @pytest.mark.asyncio
+    async def test_apply_feature_settings(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        settings = FeatureFlagSettings(slash_goal=True)
+        with patch.object(
+            sdk._client,
+            "apply_flag_settings",
+            new_callable=AsyncMock,
+            return_value={"ok": True},
+        ) as apply:
+            result = await sdk.apply_feature_settings(settings)
+
+        assert result == {"ok": True}
+        apply.assert_awaited_once_with({"features": {"slashGoal": True}})
+        assert sdk.config.features == settings
+
+    @pytest.mark.asyncio
     async def test_get_account_info(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
@@ -300,6 +387,95 @@ class TestSDKMethods:
         with patch.object(sdk._client, "save_session", new_callable=AsyncMock, return_value={"success": True}):
             result = await sdk.save_session()
             assert result["success"]
+
+    @pytest.mark.asyncio
+    async def test_persistent_goal_helpers_are_typed_and_camel_case(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        snapshot = {
+            "version": 1,
+            "goal": None,
+            "queue": [],
+            "completed": [],
+            "updatedAt": 10,
+        }
+        mutation = {"ok": True, "goal": None, "queue": []}
+        template = {
+            "name": "ship",
+            "path": "goals/ship.md",
+            "aliases": [],
+            "allowCommands": True,
+            "requiredPlaceholders": [],
+            "requiredFlags": [],
+            "requiresArgs": False,
+        }
+        with (
+            patch.object(sdk._client, "get_goal", new_callable=AsyncMock, return_value=snapshot),
+            patch.object(
+                sdk._client,
+                "create_goal",
+                new_callable=AsyncMock,
+                return_value=mutation,
+            ) as create,
+            patch.object(
+                sdk._client,
+                "update_goal",
+                new_callable=AsyncMock,
+                return_value=mutation,
+            ) as update,
+            patch.object(
+                sdk._client,
+                "queue_goal",
+                new_callable=AsyncMock,
+                return_value=mutation,
+            ) as queue,
+            patch.object(
+                sdk._client,
+                "start_queued_goal",
+                new_callable=AsyncMock,
+                return_value=mutation,
+            ) as start_queued,
+            patch.object(
+                sdk._client,
+                "list_goal_templates",
+                new_callable=AsyncMock,
+                return_value=[template],
+            ),
+        ):
+            current = await sdk.get_goal()
+            created = await sdk.create_goal("Ship parity", token_budget=1000)
+            updated = await sdk.update_goal(UpdateGoalParams(token_budget=None))
+            queued = await sdk.queue_goal("Document parity", time_budget_seconds=60)
+            started = await sdk.start_queued_goal()
+            templates = await sdk.list_goal_templates()
+
+        assert isinstance(current, GoalSnapshot)
+        assert current.updated_at == 10
+        assert isinstance(created, GoalMutationResult)
+        create.assert_awaited_once_with({"objective": "Ship parity", "tokenBudget": 1000})
+        update.assert_awaited_once_with({"tokenBudget": None})
+        assert isinstance(updated, GoalMutationResult)
+        queue.assert_awaited_once_with(
+            {"objective": "Document parity", "timeBudgetSeconds": 60}
+        )
+        assert isinstance(queued, GoalMutationResult)
+        start_queued.assert_awaited_once_with()
+        assert isinstance(started, GoalMutationResult)
+        assert templates[0].allow_commands is True
+
+    @pytest.mark.asyncio
+    async def test_goal_feature_disabled_result_is_typed(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        with patch.object(
+            sdk._client,
+            "clear_goal",
+            new_callable=AsyncMock,
+            return_value={"ok": False, "message": "slashGoal disabled"},
+        ):
+            result = await sdk.clear_goal()
+
+        assert isinstance(result, GoalFeatureDisabledResult)
 
     @pytest.mark.asyncio
     async def test_start_autoresearch_returns_typed_result(self) -> None:

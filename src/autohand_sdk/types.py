@@ -494,6 +494,149 @@ def _snake_to_camel(value: str) -> str:
     return head + "".join(part.capitalize() for part in tail)
 
 
+class GoalModel(BaseModel):
+    """Base model for persistent-goal RPC values."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+    )
+
+
+GoalStatus: TypeAlias = Literal["active", "paused", "budgetLimited", "complete"]
+
+
+class GoalState(GoalModel):
+    """Active persistent-goal state."""
+
+    goal_id: str
+    objective: str
+    status: GoalStatus
+    token_budget: int | None = None
+    time_budget_seconds: int | None = None
+    min_tokens_before_wrap_up: int | None = None
+    min_time_seconds_before_wrap_up: int | None = None
+    tokens_used: int
+    time_used_seconds: int
+    created_at: int
+    updated_at: int
+
+
+class QueuedGoal(GoalModel):
+    """Goal waiting for the active goal to finish."""
+
+    queue_id: str
+    objective: str
+    token_budget: int | None = None
+    time_budget_seconds: int | None = None
+    min_tokens_before_wrap_up: int | None = None
+    min_time_seconds_before_wrap_up: int | None = None
+    source: Literal["command", "tool", "rpc", "cli"]
+    template: str | None = None
+    template_flags: dict[str, str] | None = None
+    template_args: str | None = None
+    created_at: int
+
+
+class CompletedGoal(GoalModel):
+    """Completed or budget-limited persistent goal."""
+
+    goal_id: str
+    objective: str
+    status: Literal["complete", "budgetLimited"]
+    tokens_used: int
+    time_used_seconds: int
+    created_at: int
+    completed_at: int
+
+
+class GoalSnapshot(GoalModel):
+    """Current persistent-goal state, queue, and completion history."""
+
+    version: Literal[1]
+    goal: GoalState | None
+    queue: list[QueuedGoal]
+    completed: list[CompletedGoal]
+    updated_at: int
+
+
+class GoalTemplateMetadata(GoalModel):
+    """Metadata for one reusable goal template."""
+
+    name: str
+    path: str
+    description: str | None = None
+    aliases: list[str]
+    allow_commands: bool
+    required_placeholders: list[str]
+    required_flags: list[str]
+    requires_args: bool
+
+
+class GoalTelemetry(GoalModel):
+    """Optional remaining-budget telemetry after a goal mutation."""
+
+    time_remaining_seconds: int | None = None
+    tokens_remaining: int | None = None
+    completion_floor_met: bool | None = None
+
+
+class GoalMutationResult(GoalModel):
+    """Result of creating, updating, clearing, queuing, or starting a goal."""
+
+    ok: bool
+    goal: GoalState | None = None
+    queue: list[QueuedGoal] = Field(default_factory=list)
+    telemetry: GoalTelemetry | None = None
+    message: str | None = None
+    queued: list[QueuedGoal] | None = None
+    started: QueuedGoal | None = None
+    completed: CompletedGoal | None = None
+    completed_run: list[CompletedGoal] | None = None
+    dequeued: QueuedGoal | None = None
+    removed: QueuedGoal | None = None
+
+
+class GoalFeatureDisabledResult(GoalModel):
+    """Returned when the persistent-goal feature is disabled."""
+
+    ok: Literal[False]
+    message: str
+
+
+class GoalBudgetParams(GoalModel):
+    """Shared persistent-goal budget options."""
+
+    token_budget: int | None = Field(None, gt=0)
+    time_budget_seconds: int | None = Field(None, gt=0)
+    min_tokens_before_wrap_up: int | None = Field(None, ge=0)
+    min_time_seconds_before_wrap_up: int | None = Field(None, ge=0)
+
+
+class CreateGoalParams(GoalBudgetParams):
+    """Parameters for creating or queueing a persistent goal."""
+
+    objective: str
+
+
+class UpdateGoalParams(GoalModel):
+    """Parameters for updating the active persistent goal."""
+
+    objective: str | None = None
+    status: GoalStatus | None = None
+    token_budget: int | None = Field(None, gt=0)
+    time_budget_seconds: int | None = Field(None, gt=0)
+    min_tokens_before_wrap_up: int | None = Field(None, ge=0)
+    min_time_seconds_before_wrap_up: int | None = Field(None, ge=0)
+
+
+QueueGoalParams: TypeAlias = CreateGoalParams
+GoalSnapshotResult: TypeAlias = GoalSnapshot | GoalFeatureDisabledResult
+GoalMutationRPCResult: TypeAlias = GoalMutationResult | GoalFeatureDisabledResult
+GoalTemplatesResult: TypeAlias = list[GoalTemplateMetadata] | GoalFeatureDisabledResult
+
+
 class AutoresearchModel(BaseModel):
     """Base model for forward-compatible autoresearch RPC values."""
 
@@ -1129,6 +1272,26 @@ class AbortResult(BaseModel):
     message: str | None = None
 
 
+class FeatureFlagSettings(BaseModel):
+    """Current CLI feature and experiment settings."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+    )
+
+    environment: str | None = None
+    remote_overrides: dict[str, Literal["off"]] | None = None
+    usage_v2: bool | None = None
+    aws_bedrock_provider: bool | None = None
+    slash_goal: bool | None = None
+    token_usage_status: bool | None = None
+    experimental_fork: bool | None = None
+    experimental_clone: bool | None = None
+    experimental_handoff: bool | None = None
+
+
 # =============================================================================
 # Main Configuration
 # =============================================================================
@@ -1183,13 +1346,18 @@ class SDKConfig(BaseModel):
     # Execution settings
     auto_mode: bool | None = Field(None, description="Enable auto-mode for autonomous execution")
     unrestricted: bool | None = Field(None, description="Run in unrestricted mode")
+    auto_commit: bool | None = Field(None, description="Enable auto-commit with an LLM-generated message")
+    bare: bool | None = Field(None, description="Start the minimal explicit runtime")
+    idle_logout: bool | None = Field(None, description="Keep authenticated idle logout enabled")
     max_iterations: int | None = Field(None, description="Maximum number of iterations in auto-mode", gt=0)
     max_runtime: int | None = Field(None, description="Maximum runtime in minutes", gt=0)
     max_cost: float | None = Field(None, description="Maximum API cost in dollars", ge=0)
 
     # System prompt settings
     sys_prompt: str | None = Field(None, description="System prompt (inline string or file path)")
+    system_prompt_file: str | None = Field(None, description="File that replaces the system prompt")
     append_sys_prompt: str | None = Field(None, description="Append to system prompt")
+    append_system_prompt_file: str | None = Field(None, description="File appended to the system prompt")
 
     # YOLO (auto-approve) settings
     yolo: str | None = Field(None, description="Auto-approve tool calls matching pattern")
@@ -1225,6 +1393,14 @@ class SDKConfig(BaseModel):
     session_id: str | None = Field(None, description="Session ID to resume (legacy)")
     resume: bool | None = Field(None, description="Resume from last session (legacy)")
     continue_: bool | None = Field(None, alias="continue", description="Continue from last session (legacy)")
+    fork: str | None = Field(None, description="Fork an existing session before startup")
+
+    # Runtime integration configuration
+    display_language: str | None = Field(None, description="CLI display language locale")
+    mcp_config: str | None = Field(None, description="Explicit MCP config file")
+    agents: str | None = Field(None, description="Inline agents JSON or external agents directory")
+    plugin_dir: str | None = Field(None, description="Explicit plugin or meta-tool directory")
+    features: FeatureFlagSettings | None = Field(None, description="CLI feature settings applied at startup")
 
     # AGENTS.md configuration
     agents_md: AgentsMdSettings | None = Field(None, description="AGENTS.md settings")

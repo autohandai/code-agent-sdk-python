@@ -36,14 +36,20 @@ Common keyword arguments:
 - `azure_auth_method`, `azure_tenant_id`, `azure_client_id`, `azure_client_secret`, `azure_resource_name`, `azure_deployment_name`: Azure-specific settings.
 - `auto_mode`: start CLI with `--auto-mode`.
 - `unrestricted`: start CLI with `--unrestricted`.
+- `bare`: start the minimal explicit runtime with `--bare`.
+- `auto_commit`: enable `-c` automatic commits.
+- `idle_logout`: set to `False` to pass `--no-idle-logout` for long-running agents.
 - `max_iterations`, `max_runtime`, `max_cost`: execution limits passed to the CLI.
-- `sys_prompt`, `append_sys_prompt`: system prompt controls.
+- `sys_prompt`, `system_prompt_file`, `append_sys_prompt`, `append_system_prompt_file`: system prompt controls.
 - `yolo`, `yolo_timeout`: auto-approval controls.
 - `add_dir` or `additional_directories`: additional workspace directories.
 - `permission_mode`: CLI permission mode.
 - `permissions`: `PermissionSettings` object with mode, allow list, and deny list.
 - `context` or `context_compact`: context-management settings.
-- `session`, `persist_session`, `session_id`, `resume`, `continue`: session controls.
+- `session`, `persist_session`, `session_id`, `resume`, `continue`, `fork`: session controls.
+- `display_language`, `mcp_config`, `agents`, `plugin_dir`: current CLI integration flags.
+- `agents_md`: `AgentsMdSettings` forwarded to the CLI's AGENTS.md startup flags.
+- `features`: `FeatureFlagSettings` applied through `autohand.applyFlagSettings` after startup.
 - `skills`: `SkillSettings` object for advanced skill configuration.
 - `skill_refs`: direct skill names, paths, or objects.
 - `copy_skill_files`: copy local skill files into `~/.autohand/skills` before startup. Default is `True`.
@@ -68,6 +74,25 @@ sdk = AutohandSDK(config, debug=True)
 
 `model` and `provider` may be omitted when the CLI already has a working
 `~/.autohand/config.json`.
+
+## Agent Facade
+
+`Agent` starts and owns an `AutohandSDK` session while exposing the command,
+capability, and persistent-goal helpers directly:
+
+```python
+from autohand_sdk import Agent
+
+agent = await Agent.create(cwd=".")
+try:
+    result = await agent.deep_research("Map the repository architecture")
+    goal = await agent.create_goal("Implement the approved plan")
+finally:
+    await agent.close()
+```
+
+Use `Agent.from_sdk(sdk)` to wrap an SDK instance whose lifecycle is already
+managed by the application.
 
 ## Lifecycle
 
@@ -162,6 +187,68 @@ Use `rescore_autoresearch(attempt_id="attempt-1")` for one attempt or
 rejected before an RPC request is sent.
 
 See [autoresearch.md](autoresearch.md) for a complete workflow.
+
+## Slash Commands
+
+Command helpers use the normal streamed prompt channel and normalize command
+names with a leading slash.
+
+```python
+commands = await sdk.supported_commands()
+if await sdk.supports_command("deep-research"):
+    result = await sdk.deep_research("Map the repository architecture")
+    print(result.content)
+
+result = await sdk.autoresearch("Reduce benchmark latency")
+result = await sdk.command("/review", ["src", "tests"])
+
+async for event in sdk.stream_command("/deep-research", "SDK parity"):
+    ...
+```
+
+`command`, `deep_research`, and `autoresearch` return `PromptResult`. Use
+`stream_command` when each SDK event is needed.
+
+## Persistent Goals
+
+The persistent-goal helpers use all seven current goal RPCs. Python fields are
+snake_case and serialize to the CLI's lower-camel-case payloads.
+
+```python
+from autohand_sdk import UpdateGoalParams
+
+created = await sdk.create_goal(
+    "Ship the Python SDK parity release",
+    token_budget=50_000,
+    time_budget_seconds=3_600,
+)
+snapshot = await sdk.get_goal()
+updated = await sdk.update_goal(UpdateGoalParams(status="paused"))
+queued = await sdk.queue_goal("Write the release notes")
+started = await sdk.start_queued_goal()
+templates = await sdk.list_goal_templates()
+cleared = await sdk.clear_goal()
+```
+
+Results are typed as `GoalSnapshot`, `GoalMutationResult`, or a
+`GoalFeatureDisabledResult` when the CLI's `slashGoal` feature is disabled.
+Pass an explicit `None` in `UpdateGoalParams`, such as
+`UpdateGoalParams(token_budget=None)`, to clear a nullable budget.
+
+## Feature Settings
+
+Configure feature settings at startup or apply them to a running SDK:
+
+```python
+from autohand_sdk import AutohandSDK, FeatureFlagSettings
+
+features = FeatureFlagSettings(slash_goal=True, experimental_fork=True)
+sdk = AutohandSDK(features=features)
+await sdk.start()  # applies features after the RPC runtime is healthy
+
+await sdk.apply_feature_settings(FeatureFlagSettings(token_usage_status=True))
+await sdk.apply_flag_settings({"features": {"experimentalClone": True}})
+```
 
 ## Events
 

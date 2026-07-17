@@ -8,7 +8,13 @@ import pytest
 
 from autohand_sdk.errors import TransportError
 from autohand_sdk.rpc_client import RPC_METHODS, RPCClient
-from autohand_sdk.types import ContextSettings, PermissionSettings, SDKConfig, SessionSettings
+from autohand_sdk.types import (
+    AgentsMdSettings,
+    ContextSettings,
+    PermissionSettings,
+    SDKConfig,
+    SessionSettings,
+)
 
 
 class TestRPCClientInitialization:
@@ -109,6 +115,44 @@ class TestRPCClientInitialization:
         assert opts.summarization_threshold == 0.8
         assert opts.permission_allow_list == ["read"]
         assert opts.permission_deny_list == ["delete"]
+
+    def test_init_maps_current_runtime_and_agents_md_options(self) -> None:
+        client = RPCClient(
+            SDKConfig(
+                bare=True,
+                auto_commit=True,
+                idle_logout=False,
+                fork="session-parent",
+                display_language="en-NZ",
+                system_prompt_file="system.md",
+                append_system_prompt_file="append.md",
+                mcp_config="mcp.json",
+                agents="./agents",
+                plugin_dir="./plugins",
+                agents_md=AgentsMdSettings(
+                    enable=True,
+                    create=True,
+                    path="AGENTS.md",
+                    auto_update=True,
+                ),
+            )
+        )
+
+        opts = client._transport.options
+        assert opts.bare is True
+        assert opts.auto_commit is True
+        assert opts.idle_logout is False
+        assert opts.fork == "session-parent"
+        assert opts.display_language == "en-NZ"
+        assert opts.system_prompt_file == "system.md"
+        assert opts.append_system_prompt_file == "append.md"
+        assert opts.mcp_config == "mcp.json"
+        assert opts.agents == "./agents"
+        assert opts.plugin_dir == "./plugins"
+        assert opts.agents_md_enable is True
+        assert opts.agents_md_create is True
+        assert opts.agents_md_path == "AGENTS.md"
+        assert opts.agents_md_auto_update is True
 
     def test_init_with_env_vars(self) -> None:
         config = SDKConfig(
@@ -296,6 +340,50 @@ class TestRPCClientMethods:
         with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
             result = await client.save_session()
             assert result["success"]
+
+    @pytest.mark.asyncio
+    async def test_persistent_goal_rpc_methods(self) -> None:
+        client = RPCClient()
+        with patch.object(
+            client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"ok": True},
+        ) as request:
+            await client.get_goal()
+            await client.create_goal({"objective": "Ship", "tokenBudget": 1000})
+            await client.update_goal({"status": "paused"})
+            await client.clear_goal()
+            await client.queue_goal({"objective": "Document"})
+            await client.start_queued_goal()
+            await client.list_goal_templates()
+
+        assert request.await_args_list == [
+            (("autohand.goal.get", {}),),
+            (("autohand.goal.create", {"objective": "Ship", "tokenBudget": 1000}),),
+            (("autohand.goal.update", {"status": "paused"}),),
+            (("autohand.goal.clear", {}),),
+            (("autohand.goal.queue", {"objective": "Document"}),),
+            (("autohand.goal.startQueued", {}),),
+            (("autohand.goal.listTemplates", {}),),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_apply_flag_settings_rpc(self) -> None:
+        client = RPCClient()
+        settings = {"features": {"slashGoal": True}}
+        with patch.object(
+            client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"ok": True},
+        ) as request:
+            await client.apply_flag_settings(settings)
+
+        request.assert_awaited_once_with(
+            "autohand.applyFlagSettings",
+            {"settings": settings},
+        )
 
     @pytest.mark.asyncio
     async def test_autoresearch_lifecycle_rpc_methods(self) -> None:

@@ -36,6 +36,7 @@ Examples:
     ... )
 """
 
+from autohand_sdk.agent import Agent
 from autohand_sdk.errors import (
     AutohandSDKError,
     RequestTimeoutError,
@@ -93,13 +94,27 @@ from autohand_sdk.types import (
     AutoresearchStatusResult,
     AutoresearchStopResult,
     AutoresearchSubagentOptions,
+    CompletedGoal,
     ContextSettings,
     # Context types
     ContextUsage,
+    CreateGoalParams,
+    FeatureFlagSettings,
     GetMessagesParams,
     GetMessagesResult,
     GetStateParams,
     GetStateResult,
+    GoalBudgetParams,
+    GoalFeatureDisabledResult,
+    GoalMutationResult,
+    GoalMutationRPCResult,
+    GoalSnapshot,
+    GoalSnapshotResult,
+    GoalState,
+    GoalStatus,
+    GoalTelemetry,
+    GoalTemplateMetadata,
+    GoalTemplatesResult,
     McpServerConfig,
     # Model types
     ModelInfo,
@@ -113,6 +128,7 @@ from autohand_sdk.types import (
     ProviderConfigError,
     # Provider types
     ProviderName,
+    QueuedGoal,
     # Core types
     SDKConfig,
     SDKEvent,
@@ -129,6 +145,7 @@ from autohand_sdk.types import (
     # Tool types
     Tool,
     TypedSDKEvent,
+    UpdateGoalParams,
     create_default_agents_md,
     detect_provider_from_model,
     get_skill_name,
@@ -143,6 +160,7 @@ __version__ = "0.1.0"
 __all__ = [
     # Main classes
     "AutohandSDK",
+    "Agent",
     "RPCClient",
     "Transport",
     "AutohandSDKError",
@@ -162,6 +180,24 @@ __all__ = [
     "GetMessagesParams",
     "GetMessagesResult",
     "PermissionResponseParams",
+    # Persistent goal types
+    "GoalStatus",
+    "GoalState",
+    "QueuedGoal",
+    "CompletedGoal",
+    "GoalSnapshot",
+    "GoalTemplateMetadata",
+    "GoalTelemetry",
+    "GoalMutationResult",
+    "GoalFeatureDisabledResult",
+    "GoalBudgetParams",
+    "CreateGoalParams",
+    "UpdateGoalParams",
+    "GoalSnapshotResult",
+    "GoalMutationRPCResult",
+    "GoalTemplatesResult",
+    # Feature types
+    "FeatureFlagSettings",
     # Autoresearch types
     "AutoresearchSubagentOptions",
     "AutoresearchOptimizationDirection",
