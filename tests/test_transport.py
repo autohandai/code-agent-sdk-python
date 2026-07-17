@@ -318,6 +318,9 @@ class TestTransportStartArguments:
             "    'cwd': os.getcwd(),\n"
             "    'stream': os.environ.get('AUTOHAND_STREAM_TOOL_OUTPUT'),\n"
             "    'debug': os.environ.get('AUTOHAND_DEBUG'),\n"
+            "    'ai_key': os.environ.get('AUTOHAND_AI_API_KEY'),\n"
+            "    'ai_base_url': os.environ.get('AUTOHAND_AI_BASE_URL'),\n"
+            "    'ai_plan': os.environ.get('AUTOHAND_AI_PLAN'),\n"
             "}))\n"
             "for _line in sys.stdin:\n"
             "    pass\n",
@@ -332,7 +335,7 @@ class TestTransportStartArguments:
                 unrestricted=True,
                 auto_mode=True,
                 auto_skill=True,
-                model="fantail2",
+                model="fantail",
                 temperature=0.4,
                 max_iterations=5,
                 max_runtime=10,
@@ -359,6 +362,10 @@ class TestTransportStartArguments:
                 max_tokens=1000,
                 compression_threshold=0.7,
                 summarization_threshold=0.8,
+                provider="autohandai",
+                api_key="ah-test-key",
+                base_url="https://api.example.test/v1",
+                autohand_ai_plan="cloud",
                 env_vars={"ARGS_FILE": str(args_file), "AUTOHAND_DEBUG": "1"},
             )
         )
@@ -376,11 +383,14 @@ class TestTransportStartArguments:
         assert data["cwd"] == str(tmp_path)
         assert data["stream"] == "1"
         assert data["debug"] == "1"
+        assert data["ai_key"] == "ah-test-key"
+        assert data["ai_base_url"] == "https://api.example.test/v1"
+        assert data["ai_plan"] == "cloud"
         assert argv[:2] == ["--mode", "rpc"]
         assert "--unrestricted" in argv
         assert "--auto-mode" in argv
         assert "--auto-skill" in argv
-        assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "fantail2"]
+        assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "fantail"]
         assert argv[argv.index("--skills") : argv.index("--skills") + 2] == ["--skills", "typescript"]
         assert "--custom" in argv
 

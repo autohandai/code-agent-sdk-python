@@ -41,7 +41,8 @@ python/
 - **SDKConfig**: Comprehensive configuration with Pydantic validation
 - **SkillReference**: Union type supporting string names, file paths, or objects
 - **ProviderName**: Enum for all supported LLM providers
-- **Event Types**: TypedDict-style events for streaming
+- **Event Types**: Pydantic lifecycle and operation events for streaming
+- **Autoresearch**: Typed lifecycle, replay ledger, evaluation, decision, retention, and event contracts
 - **Auto-detection**: `detect_provider_from_model()` for provider inference
 - **Skill helpers**: `is_skill_file_path()`, `get_skill_name()`, `get_skill_path()`
 
@@ -56,12 +57,14 @@ python/
 - **Skill processing**: Separates skill activation names from local files to copy
 - **Method coverage**: Uses current CLI method names (`autohand.prompt`, `autohand.getState`, etc.)
 - **Event streaming**: Converts CLI notifications into Python event dictionaries with snake_case aliases
+- **Autoresearch RPC**: Exact lifecycle and ledger method mappings from the TypeScript v1.0.3 contract
 
 ### 4. Main SDK (`sdk.py`)
 - **Context manager**: `async with AutohandSDK()` pattern
 - **Skills API**: Property getter/setter with auto-rebuild
 - **Streaming**: `stream_prompt()` yields typed events
 - **State management**: get_state, get_messages, save_session
+- **Replayable autoresearch**: Typed start/status/stop, history, replay, rescore, compare, Pareto, pin, and prune helpers
 
 ## Skills API
 
@@ -69,7 +72,9 @@ python/
 ```python
 sdk = AutohandSDK(
     cwd=".",
-    model="fantail2",
+    provider="autohandai",
+    model="fantail",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
     skills=["typescript", "testing", "react"],
 )
 # Agent references via /skill typescript
@@ -79,7 +84,9 @@ sdk = AutohandSDK(
 ```python
 sdk = AutohandSDK(
     cwd=".",
-    model="fantail2",
+    provider="autohandai",
+    model="fantail",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
     skills=[
         "typescript",                           # Built-in
         "./skills/my-custom/SKILL.md",          # Local file
@@ -93,11 +100,11 @@ sdk = AutohandSDK(
 
 | Module | Coverage | Notes |
 |--------|----------|-------|
-| types.py | 96.45% | Comprehensive model tests |
-| sdk.py | 94.92% | Full SDK lifecycle tests |
-| rpc_client.py | 91%+ | Client method and notification streaming tests |
-| transport.py | 86%+ | Subprocess, response, timeout, error, and notification tests |
-| **Total** | **91%+** | **119 tests passing** |
+| types.py | 96.70% | Comprehensive model tests |
+| sdk.py | 73.73% | SDK lifecycle and typed helper tests |
+| rpc_client.py | 94.18% | Client method and notification streaming tests |
+| transport.py | 84.29% | Subprocess, response, timeout, error, and notification tests |
+| **Total** | **89%+** | **140 tests passing** |
 
 ## Commands
 
@@ -132,8 +139,9 @@ uv run ruff format .
 ✅ Context manager support
 ✅ Real JSON-RPC response reader and notification routing
 ✅ SDK-specific transport/RPC exceptions
-✅ 119 passing tests
-✅ 91%+ test coverage
+✅ 140 passing tests
+✅ 89%+ test coverage
+✅ TypeScript v1.0.3 autoresearch and Autohand AI configuration parity
 
 ## Known Limitations
 

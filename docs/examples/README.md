@@ -19,7 +19,7 @@ export AUTOHAND_CLI_PATH=/Users/igorcosta/Documents/autohand/cli-3/autohand
 Optional model override:
 
 ```bash
-export AUTOHAND_MODEL=fantail2
+export AUTOHAND_MODEL=fantail
 ```
 
 When `AUTOHAND_MODEL` is not set, examples use the model/provider already
@@ -53,6 +53,7 @@ python docs/examples/01-hello-agent.py
 - `20-sdlc-discovery-plan.py`: discovery and plan workflow.
 - `21-sdlc-gated-implementation.py`: gated implementation workflow.
 - `22-sdlc-release-readiness.py`: release readiness check workflow.
+- `27-autoresearch-ledger.py`: typed replayable autoresearch lifecycle and ledger inspection.
 
 Examples that create or edit files use scratch workspaces under the system temp
 directory, usually `/tmp/autohand-sdk-examples/...`. The direct skill example

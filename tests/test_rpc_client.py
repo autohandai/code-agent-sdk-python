@@ -20,9 +20,9 @@ class TestRPCClientInitialization:
         assert not client._started
 
     def test_init_with_config(self) -> None:
-        config = SDKConfig(model="fantail2")
+        config = SDKConfig(model="fantail", api_key="ah-test-key")
         client = RPCClient(config)
-        assert client.config.model == "fantail2"
+        assert client.config.model == "fantail"
 
     def test_init_with_skills(self) -> None:
         config = SDKConfig(skill_refs=["typescript", "./skills/custom/SKILL.md"])
@@ -40,7 +40,10 @@ class TestRPCClientInitialization:
 
     def test_init_maps_config_to_transport_options(self) -> None:
         config = SDKConfig(
-            model="fantail2",
+            model="fantail",
+            api_key="ah-test-key",
+            base_url="https://api.example.test/v1",
+            autohand_ai_plan="cloud",
             temperature=0.2,
             max_iterations=5,
             max_runtime=10,
@@ -77,7 +80,11 @@ class TestRPCClientInitialization:
 
         client = RPCClient(config)
         opts = client._transport.options
-        assert opts.model == "fantail2"
+        assert opts.model == "fantail"
+        assert opts.provider == "autohandai"
+        assert opts.api_key == "ah-test-key"
+        assert opts.base_url == "https://api.example.test/v1"
+        assert opts.autohand_ai_plan == "cloud"
         assert opts.temperature == 0.2
         assert opts.max_iterations == 5
         assert opts.max_runtime == 10
@@ -199,7 +206,7 @@ class TestRPCClientMethods:
     async def test_initialize(self) -> None:
         client = RPCClient()
         with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
-            result = await client.initialize({"model": "fantail2"})
+            result = await client.initialize({"model": "fantail"})
             assert result["success"]
 
     @pytest.mark.asyncio
@@ -228,7 +235,7 @@ class TestRPCClientMethods:
         client = RPCClient()
         with patch.object(client, "_request", new_callable=AsyncMock, return_value={
             "status": "idle",
-            "model": "fantail2",
+            "model": "fantail",
             "workspace": "/test",
         }):
             result = await client.get_state()
@@ -244,9 +251,9 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_get_models(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"models": [{"id": "fantail2"}]}):
+        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"models": [{"id": "fantail"}]}):
             result = await client.get_models()
-            assert result == {"models": [{"id": "fantail2"}]}
+            assert result == {"models": [{"id": "fantail"}]}
 
     @pytest.mark.asyncio
     async def test_get_agents(self) -> None:
@@ -259,7 +266,7 @@ class TestRPCClientMethods:
     async def test_set_model(self) -> None:
         client = RPCClient()
         with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
-            result = await client.set_model("fantail2")
+            result = await client.set_model("fantail")
             assert result["success"]
 
     @pytest.mark.asyncio
@@ -289,6 +296,42 @@ class TestRPCClientMethods:
         with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
             result = await client.save_session()
             assert result["success"]
+
+    @pytest.mark.asyncio
+    async def test_autoresearch_lifecycle_rpc_methods(self) -> None:
+        client = RPCClient()
+        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}) as request:
+            await client.start_autoresearch({"objective": "Improve latency", "maxIterations": 5})
+            await client.get_autoresearch_status()
+            await client.stop_autoresearch()
+
+        assert request.await_args_list == [
+            (("autohand.autoresearch.start", {"objective": "Improve latency", "maxIterations": 5}),),
+            (("autohand.autoresearch.status", {}),),
+            (("autohand.autoresearch.stop", {}),),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_autoresearch_ledger_rpc_methods(self) -> None:
+        client = RPCClient()
+        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}) as request:
+            await client.get_autoresearch_history()
+            await client.replay_autoresearch({"attemptId": "attempt-1", "evaluator": "original"})
+            await client.rescore_autoresearch({"attemptId": "attempt-1"})
+            await client.compare_autoresearch({"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"})
+            await client.get_autoresearch_pareto()
+            await client.pin_autoresearch({"attemptId": "attempt-1", "pinned": True})
+            await client.prune_autoresearch({"dryRun": False, "yes": True})
+
+        assert request.await_args_list == [
+            (("autohand.autoresearch.history", {}),),
+            (("autohand.autoresearch.replay", {"attemptId": "attempt-1", "evaluator": "original"}),),
+            (("autohand.autoresearch.rescore", {"attemptId": "attempt-1"}),),
+            (("autohand.autoresearch.compare", {"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"}),),
+            (("autohand.autoresearch.pareto", {}),),
+            (("autohand.autoresearch.pin", {"attemptId": "attempt-1", "pinned": True}),),
+            (("autohand.autoresearch.prune", {"dryRun": False, "yes": True}),),
+        ]
 
     @pytest.mark.asyncio
     async def test_request_not_initialized(self) -> None:
@@ -333,7 +376,7 @@ class TestRPCClientMethods:
             "for line in sys.stdin:\n"
             "    req = json.loads(line)\n"
             "    print(json.dumps({'jsonrpc': '2.0', 'method': 'autohand.agentStart', 'params': {\n"
-            "        'sessionId': 's1', 'model': 'fantail2', 'workspace': '.', 'timestamp': 't1'\n"
+            "        'sessionId': 's1', 'model': 'fantail', 'workspace': '.', 'timestamp': 't1'\n"
             "    }}), flush=True)\n"
             "    print(json.dumps({'jsonrpc': '2.0', 'method': 'autohand.messageUpdate', 'params': {\n"
             "        'messageId': 'm1', 'delta': 'hello', 'timestamp': 't2'\n"
@@ -365,6 +408,39 @@ class TestRPCClientMethods:
         ]
         assert events[0]["session_id"] == "s1"
         assert events[1]["message_id"] == "m1"
+
+    def test_maps_autoresearch_notifications(self) -> None:
+        client = RPCClient()
+        client._handle_notification(
+            {
+                "_method": "autohand.autoresearch.status",
+                "active": True,
+                "maxIterations": 10,
+                "runsLogged": 2,
+                "statusText": "Running",
+                "subcommand": "status",
+                "timestamp": "t1",
+            }
+        )
+        client._handle_notification(
+            {
+                "_method": "autohand.autoresearch.event",
+                "operation": "replay",
+                "phase": "completed",
+                "attemptId": "attempt-1",
+                "success": True,
+                "timestamp": "t2",
+            }
+        )
+
+        lifecycle = client._event_queue.get_nowait()
+        operation = client._event_queue.get_nowait()
+        assert lifecycle["type"] == "autoresearch"
+        assert lifecycle["phase"] == "status"
+        assert lifecycle["max_iterations"] == 10
+        assert operation["type"] == "autoresearch"
+        assert operation["operation"] == "replay"
+        assert operation["attempt_id"] == "attempt-1"
 
 
 class TestRPCClientIsRunning:

@@ -13,6 +13,7 @@ from autohand_sdk import AutohandSDK
 
 
 def checkout_discount(cart: dict[str, object]) -> float:
+    """Reproduce a checkout discount calculation from an incident."""
     try:
         customer = cart["customer"]
         loyalty_tier = customer["loyalty_tier"]  # type: ignore[index]
@@ -22,6 +23,7 @@ def checkout_discount(cart: dict[str, object]) -> float:
 
 
 def capture_runtime_error() -> str:
+    """Capture the representative runtime failure as a traceback."""
     try:
         checkout_discount({"subtotal": 129, "customer": None})
     except Exception:
@@ -30,6 +32,7 @@ def capture_runtime_error() -> str:
 
 
 async def main() -> None:
+    """Ask the agent to reproduce, repair, test, commit, and open a PR."""
     target_repo = os.environ.get("AUTOHAND_TARGET_REPO", ".")
     sdk = AutohandSDK(
         cwd=target_repo,

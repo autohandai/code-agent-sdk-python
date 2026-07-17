@@ -30,6 +30,16 @@ RPC_METHODS = {
     "set_model": "autohand.modelSet",
     "apply_flag_settings": "autohand.applyFlagSettings",
     "get_account_info": "autohand.getAccountInfo",
+    "autoresearch_start": "autohand.autoresearch.start",
+    "autoresearch_status": "autohand.autoresearch.status",
+    "autoresearch_stop": "autohand.autoresearch.stop",
+    "autoresearch_history": "autohand.autoresearch.history",
+    "autoresearch_replay": "autohand.autoresearch.replay",
+    "autoresearch_rescore": "autohand.autoresearch.rescore",
+    "autoresearch_compare": "autohand.autoresearch.compare",
+    "autoresearch_pareto": "autohand.autoresearch.pareto",
+    "autoresearch_pin": "autohand.autoresearch.pin",
+    "autoresearch_prune": "autohand.autoresearch.prune",
 }
 
 NOTIFICATION_EVENT_TYPES = {
@@ -50,6 +60,16 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.changesBatchStart": "changes_batch_start",
     "autohand.changesBatchUpdate": "changes_batch_update",
     "autohand.changesBatchEnd": "changes_batch_end",
+    "autohand.autoresearch.start": "autoresearch",
+    "autohand.autoresearch.status": "autoresearch",
+    "autohand.autoresearch.pause": "autoresearch",
+    "autohand.autoresearch.event": "autoresearch",
+}
+
+AUTORESEARCH_LIFECYCLE_PHASES = {
+    "autohand.autoresearch.start": "start",
+    "autohand.autoresearch.status": "status",
+    "autohand.autoresearch.pause": "pause",
 }
 
 CAMEL_TO_SNAKE_KEYS = {
@@ -63,6 +83,14 @@ CAMEL_TO_SNAKE_KEYS = {
     "changeType": "change_type",
     "contextPercent": "context_percent",
     "messageCount": "message_count",
+    "maxIterations": "max_iterations",
+    "runsLogged": "runs_logged",
+    "statusText": "status_text",
+    "attemptId": "attempt_id",
+    "bytesFreed": "bytes_freed",
+    "remainingBytes": "remaining_bytes",
+    "evaluatorMode": "evaluator_mode",
+    "driftWarnings": "drift_warnings",
 }
 
 
@@ -225,6 +253,46 @@ class RPCClient:
         """
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_state"], {}))
 
+    async def start_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Initialize or resume an autoresearch session."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_start"], params))
+
+    async def get_autoresearch_status(self) -> dict[str, Any]:
+        """Read the current autoresearch lifecycle and ledger summary."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_status"], {}))
+
+    async def stop_autoresearch(self) -> dict[str, Any]:
+        """Pause autoresearch without deleting its persisted state."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_stop"], {}))
+
+    async def get_autoresearch_history(self) -> dict[str, Any]:
+        """List immutable autoresearch attempts."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_history"], {}))
+
+    async def replay_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Replay one attempt with its original or the current evaluator."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_replay"], params))
+
+    async def rescore_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Apply current decision policy to stored measurements."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_rescore"], params))
+
+    async def compare_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Compare two autoresearch attempts."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_compare"], params))
+
+    async def get_autoresearch_pareto(self) -> dict[str, Any]:
+        """List constraint-passing non-dominated attempts."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_pareto"], {}))
+
+    async def pin_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Protect or release an attempt's artifacts from pruning."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_pin"], params))
+
+    async def prune_autoresearch(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Preview or explicitly apply autoresearch artifact pruning."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_prune"], params or {}))
+
     async def _request(self, method: str, params: dict[str, Any]) -> Any:
         """Send a request to the transport."""
         if not self._transport:
@@ -263,6 +331,10 @@ class RPCClient:
             continue_session=self.config.continue_,
             context_compact=self.config.context_compact,
             copy_skill_files=self.config.copy_skill_files,
+            provider=self.config.provider.value if self.config.provider else None,
+            api_key=self.config.api_key,
+            base_url=self.config.base_url,
+            autohand_ai_plan=self.config.autohand_ai_plan,
         )
 
         if self.config.session:
@@ -367,9 +439,13 @@ class RPCClient:
 
     def _notification_to_event(self, event_type: str, params: dict[str, Any]) -> dict[str, Any]:
         """Normalize CLI notification params into a Python-friendly event dict."""
+        method = params.get("_method")
         event = {k: v for k, v in params.items() if k != "_method"}
         for camel, snake in CAMEL_TO_SNAKE_KEYS.items():
             if camel in event and snake not in event:
                 event[snake] = event[camel]
         event["type"] = event_type
+        lifecycle_phase = AUTORESEARCH_LIFECYCLE_PHASES.get(method) if isinstance(method, str) else None
+        if lifecycle_phase is not None:
+            event["phase"] = lifecycle_phase
         return event

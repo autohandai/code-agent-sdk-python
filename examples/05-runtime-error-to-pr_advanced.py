@@ -9,6 +9,7 @@ from autohand_sdk import AutohandSDK
 
 
 def github_token_env_name() -> str:
+    """Return the configured GitHub token environment-variable name."""
     if os.environ.get("GITHUB_TOKEN"):
         return "GITHUB_TOKEN"
     if os.environ.get("GH_TOKEN"):
@@ -17,6 +18,7 @@ def github_token_env_name() -> str:
 
 
 def incident_packet() -> dict[str, object]:
+    """Build the example incident metadata supplied to the agent."""
     return {
         "id": "INC-2026-05-12-0417",
         "severity": "sev2",
@@ -41,6 +43,7 @@ def incident_packet() -> dict[str, object]:
 
 
 async def main() -> None:
+    """Run the advanced runtime-error-to-PR workflow."""
     target_repo = os.environ.get("AUTOHAND_TARGET_REPO", ".")
     token_env_name = github_token_env_name()
     sdk = AutohandSDK(

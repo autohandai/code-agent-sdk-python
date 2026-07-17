@@ -8,10 +8,16 @@ Examples:
     Basic usage:
 
     >>> import asyncio
+    >>> import os
     >>> from autohand_sdk import AutohandSDK
     >>>
     >>> async def main():
-    ...     sdk = AutohandSDK(cwd="/path/to/project", model="fantail2")
+    ...     sdk = AutohandSDK(
+    ...         cwd="/path/to/project",
+    ...         provider="autohandai",
+    ...         model="fantail",
+    ...         api_key=os.environ["AUTOHAND_AI_API_KEY"],
+    ...     )
     ...     await sdk.start()
     ...     async for event in sdk.stream_prompt(message="Hello"):
     ...         print(event)
@@ -23,7 +29,9 @@ Examples:
 
     >>> sdk = AutohandSDK(
     ...     cwd=".",
-    ...     model="fantail2",
+    ...     provider="autohandai",
+    ...     model="fantail",
+    ...     api_key=os.environ["AUTOHAND_AI_API_KEY"],
     ...     skill_refs=["typescript", "./skills/custom/SKILL.md"]
     ... )
 """
@@ -47,6 +55,44 @@ from autohand_sdk.types import (
     # AGENTS.md types
     AgentsMdSettings,
     AutohandEnvVars,
+    AutoresearchChecksResult,
+    AutoresearchCompareParams,
+    AutoresearchCompareResult,
+    AutoresearchComparison,
+    AutoresearchComparisonSide,
+    AutoresearchConstraint,
+    AutoresearchConstraintResult,
+    AutoresearchDecisionRecord,
+    AutoresearchEvaluationRecord,
+    AutoresearchEvaluationSample,
+    AutoresearchEvent,
+    AutoresearchExecutionResult,
+    AutoresearchHistoryAttempt,
+    AutoresearchHistoryResult,
+    AutoresearchMaterializationState,
+    AutoresearchMetricAggregate,
+    AutoresearchOperation,
+    AutoresearchOperationEvent,
+    AutoresearchOptimizationDirection,
+    AutoresearchParetoResult,
+    AutoresearchPinParams,
+    AutoresearchPinResult,
+    AutoresearchPruneCandidate,
+    AutoresearchPruneParams,
+    AutoresearchPruneResult,
+    AutoresearchReplayParams,
+    AutoresearchReplayResult,
+    AutoresearchRescoreParams,
+    AutoresearchRescoreResult,
+    AutoresearchRetentionOptions,
+    AutoresearchSamplingOptions,
+    AutoresearchSecondaryObjective,
+    AutoresearchStartParams,
+    AutoresearchStartResult,
+    AutoresearchState,
+    AutoresearchStatusResult,
+    AutoresearchStopResult,
+    AutoresearchSubagentOptions,
     ContextSettings,
     # Context types
     ContextUsage,
@@ -116,6 +162,45 @@ __all__ = [
     "GetMessagesParams",
     "GetMessagesResult",
     "PermissionResponseParams",
+    # Autoresearch types
+    "AutoresearchSubagentOptions",
+    "AutoresearchOptimizationDirection",
+    "AutoresearchSecondaryObjective",
+    "AutoresearchConstraint",
+    "AutoresearchSamplingOptions",
+    "AutoresearchRetentionOptions",
+    "AutoresearchStartParams",
+    "AutoresearchMetricAggregate",
+    "AutoresearchEvaluationSample",
+    "AutoresearchEvaluationRecord",
+    "AutoresearchChecksResult",
+    "AutoresearchExecutionResult",
+    "AutoresearchConstraintResult",
+    "AutoresearchDecisionRecord",
+    "AutoresearchHistoryAttempt",
+    "AutoresearchMaterializationState",
+    "AutoresearchState",
+    "AutoresearchStartResult",
+    "AutoresearchStatusResult",
+    "AutoresearchStopResult",
+    "AutoresearchHistoryResult",
+    "AutoresearchReplayParams",
+    "AutoresearchReplayResult",
+    "AutoresearchRescoreParams",
+    "AutoresearchRescoreResult",
+    "AutoresearchCompareParams",
+    "AutoresearchComparisonSide",
+    "AutoresearchComparison",
+    "AutoresearchCompareResult",
+    "AutoresearchParetoResult",
+    "AutoresearchPinParams",
+    "AutoresearchPinResult",
+    "AutoresearchPruneParams",
+    "AutoresearchPruneCandidate",
+    "AutoresearchPruneResult",
+    "AutoresearchEvent",
+    "AutoresearchOperation",
+    "AutoresearchOperationEvent",
     # Provider types
     "ProviderName",
     "AutohandEnvVars",

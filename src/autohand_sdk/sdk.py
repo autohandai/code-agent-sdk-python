@@ -3,12 +3,33 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from autohand_sdk.rpc_client import RPCClient
 from autohand_sdk.types import (
     AbortParams,
     AbortResult,
+    AutoresearchCompareParams,
+    AutoresearchCompareResult,
+    AutoresearchConstraint,
+    AutoresearchHistoryResult,
+    AutoresearchParetoResult,
+    AutoresearchPinParams,
+    AutoresearchPinResult,
+    AutoresearchPruneParams,
+    AutoresearchPruneResult,
+    AutoresearchReplayParams,
+    AutoresearchReplayResult,
+    AutoresearchRescoreParams,
+    AutoresearchRescoreResult,
+    AutoresearchRetentionOptions,
+    AutoresearchSamplingOptions,
+    AutoresearchSecondaryObjective,
+    AutoresearchStartParams,
+    AutoresearchStartResult,
+    AutoresearchStatusResult,
+    AutoresearchStopResult,
+    AutoresearchSubagentOptions,
     GetMessagesParams,
     GetMessagesResult,
     GetStateParams,
@@ -326,6 +347,156 @@ class AutohandSDK:
             raise RuntimeError("SDK not started")
 
         return await self._client.save_session()
+
+    async def start_autoresearch(  # noqa: PLR0913 - public RPC options remain explicit and typed
+        self,
+        objective: str,
+        *,
+        max_iterations: int | None = None,
+        timeout_ms: int | None = None,
+        metric_name: str | None = None,
+        metric_unit: str | None = None,
+        direction: Literal["lower", "higher"] | None = None,
+        measure_command: str | None = None,
+        measure_script: str | None = None,
+        checks_command: str | None = None,
+        checks_script: str | None = None,
+        files_in_scope: list[str] | None = None,
+        subagents: AutoresearchSubagentOptions | None = None,
+        secondary_objectives: list[AutoresearchSecondaryObjective] | None = None,
+        constraints: list[AutoresearchConstraint] | None = None,
+        sampling: AutoresearchSamplingOptions | None = None,
+        retention: AutoresearchRetentionOptions | None = None,
+        environment_allowlist: list[str] | None = None,
+    ) -> AutoresearchStartResult:
+        """Initialize or resume a replayable autoresearch session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = AutoresearchStartParams(
+            objective=objective,
+            max_iterations=max_iterations,
+            timeout_ms=timeout_ms,
+            metric_name=metric_name,
+            metric_unit=metric_unit,
+            direction=direction,
+            measure_command=measure_command,
+            measure_script=measure_script,
+            checks_command=checks_command,
+            checks_script=checks_script,
+            files_in_scope=files_in_scope,
+            subagents=subagents,
+            secondary_objectives=secondary_objectives,
+            constraints=constraints,
+            sampling=sampling,
+            retention=retention,
+            environment_allowlist=environment_allowlist,
+        )
+        result = await self._client.start_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchStartResult.model_validate(result)
+
+    async def get_autoresearch_status(self) -> AutoresearchStatusResult:
+        """Read active autoresearch state, progress, attempts, and Pareto IDs."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return AutoresearchStatusResult.model_validate(
+            await self._client.get_autoresearch_status()
+        )
+
+    async def stop_autoresearch(self) -> AutoresearchStopResult:
+        """Pause autoresearch without deleting its persisted state."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return AutoresearchStopResult.model_validate(await self._client.stop_autoresearch())
+
+    async def get_autoresearch_history(self) -> AutoresearchHistoryResult:
+        """List immutable attempts and their replay/materialization state."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return AutoresearchHistoryResult.model_validate(
+            await self._client.get_autoresearch_history()
+        )
+
+    async def replay_autoresearch(
+        self,
+        attempt_id: str,
+        evaluator: Literal["original", "current"] | None = None,
+    ) -> AutoresearchReplayResult:
+        """Re-evaluate an attempt in an isolated worktree."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = AutoresearchReplayParams(attempt_id=attempt_id, evaluator=evaluator)
+        result = await self._client.replay_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchReplayResult.model_validate(result)
+
+    async def rescore_autoresearch(
+        self,
+        *,
+        attempt_id: str | None = None,
+        all: bool | None = None,
+    ) -> AutoresearchRescoreResult:
+        """Append decisions from stored measurements and current policy."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = AutoresearchRescoreParams(attempt_id=attempt_id, all=all)
+        result = await self._client.rescore_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchRescoreResult.model_validate(result)
+
+    async def compare_autoresearch(
+        self,
+        left_attempt_id: str,
+        right_attempt_id: str,
+    ) -> AutoresearchCompareResult:
+        """Compare samples, aggregates, checks, and decisions."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = AutoresearchCompareParams(
+            left_attempt_id=left_attempt_id,
+            right_attempt_id=right_attempt_id,
+        )
+        result = await self._client.compare_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchCompareResult.model_validate(result)
+
+    async def get_autoresearch_pareto(self) -> AutoresearchParetoResult:
+        """List constraint-passing non-dominated attempts."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return AutoresearchParetoResult.model_validate(
+            await self._client.get_autoresearch_pareto()
+        )
+
+    async def pin_autoresearch(self, attempt_id: str, pinned: bool) -> AutoresearchPinResult:
+        """Protect or release an attempt's artifacts from pruning."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = AutoresearchPinParams(attempt_id=attempt_id, pinned=pinned)
+        result = await self._client.pin_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchPinResult.model_validate(result)
+
+    async def prune_autoresearch(
+        self,
+        *,
+        dry_run: bool | None = None,
+        yes: bool | None = None,
+    ) -> AutoresearchPruneResult:
+        """Preview or explicitly apply autoresearch artifact pruning."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = AutoresearchPruneParams(dry_run=dry_run, yes=yes)
+        result = await self._client.prune_autoresearch(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return AutoresearchPruneResult.model_validate(result)
 
     def is_running(self) -> bool:
         """Check if the SDK is running.

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from autohand_sdk import AutohandSDK
-from autohand_sdk.types import SDKConfig
+from autohand_sdk.types import AutoresearchStartResult, SDKConfig
 
 
 @pytest.fixture(autouse=True)
@@ -26,24 +26,24 @@ class TestSDKInitialization:
         assert sdk._skills == []
 
     def test_init_with_config(self) -> None:
-        config = SDKConfig(model="fantail2", cwd="/test")
+        config = SDKConfig(model="fantail", cwd="/test", api_key="ah-test-key")
         sdk = AutohandSDK(config)
-        assert sdk.config.model == "fantail2"
+        assert sdk.config.model == "fantail"
         assert sdk.config.cwd == "/test"
 
     def test_init_with_kwargs(self) -> None:
-        sdk = AutohandSDK(model="fantail2", debug=True)
-        assert sdk.config.model == "fantail2"
+        sdk = AutohandSDK(model="fantail", api_key="ah-test-key", debug=True)
+        assert sdk.config.model == "fantail"
         assert sdk.config.debug is True
 
     def test_init_merges_kwargs(self) -> None:
-        config = SDKConfig(model="fantail2")
+        config = SDKConfig(model="fantail", api_key="ah-test-key")
         sdk = AutohandSDK(config, cwd="/merged")
-        assert sdk.config.model == "fantail2"
+        assert sdk.config.model == "fantail"
         assert sdk.config.cwd == "/merged"
 
     def test_init_with_skills(self) -> None:
-        sdk = AutohandSDK(model="fantail2", skill_refs=["typescript", "react"])
+        sdk = AutohandSDK(model="fantail", api_key="ah-test-key", skill_refs=["typescript", "react"])
         assert sdk.skills == ["typescript", "react"]
 
     def test_init_with_nested_skills(self) -> None:
@@ -205,13 +205,13 @@ class TestSDKMethods:
         sdk._started = True
         with patch.object(sdk._client, "get_state", new_callable=AsyncMock, return_value={
             "status": "idle",
-            "model": "fantail2",
+            "model": "fantail",
             "workspace": "/test",
             "message_count": 0,
         }):
             result = await sdk.get_state()
             assert result.status == "idle"
-            assert result.model == "fantail2"
+            assert result.model == "fantail"
 
     @pytest.mark.asyncio
     async def test_get_messages_not_started(self) -> None:
@@ -239,10 +239,10 @@ class TestSDKMethods:
     async def test_get_models(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_models", new_callable=AsyncMock, return_value={"models": [{"id": "fantail2"}]}):
+        with patch.object(sdk._client, "get_models", new_callable=AsyncMock, return_value={"models": [{"id": "fantail"}]}):
             result = await sdk.get_models()
             assert len(result) == 1
-            assert result[0]["id"] == "fantail2"
+            assert result[0]["id"] == "fantail"
 
     @pytest.mark.asyncio
     async def test_get_agents(self) -> None:
@@ -257,16 +257,16 @@ class TestSDKMethods:
         sdk = AutohandSDK()
         sdk._client = None
         with pytest.raises(RuntimeError, match="SDK not started"):
-            await sdk.set_model("fantail2")
+            await sdk.set_model("fantail")
 
     @pytest.mark.asyncio
     async def test_set_model(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
         with patch.object(sdk._client, "set_model", new_callable=AsyncMock, return_value={"success": True}):
-            result = await sdk.set_model("fantail2")
+            result = await sdk.set_model("fantail")
             assert result["success"]
-            assert sdk.config.model == "fantail2"
+            assert sdk.config.model == "fantail"
 
     @pytest.mark.asyncio
     async def test_set_agent(self) -> None:
@@ -300,6 +300,51 @@ class TestSDKMethods:
         with patch.object(sdk._client, "save_session", new_callable=AsyncMock, return_value={"success": True}):
             result = await sdk.save_session()
             assert result["success"]
+
+    @pytest.mark.asyncio
+    async def test_start_autoresearch_returns_typed_result(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        response = {
+            "success": True,
+            "instruction": "Run the next experiment",
+            "active": True,
+            "statusText": "Ready",
+            "runsLogged": 0,
+        }
+        with patch.object(sdk._client, "start_autoresearch", new_callable=AsyncMock, return_value=response) as start:
+            result = await sdk.start_autoresearch(
+                objective="Improve latency",
+                max_iterations=5,
+                measure_command="uv run pytest",
+            )
+
+        assert isinstance(result, AutoresearchStartResult)
+        assert result.instruction == "Run the next experiment"
+        start.assert_awaited_once_with(
+            {
+                "objective": "Improve latency",
+                "maxIterations": 5,
+                "measureCommand": "uv run pytest",
+            }
+        )
+
+    @pytest.mark.asyncio
+    async def test_autoresearch_ledger_helpers_return_typed_results(self) -> None:
+        sdk = AutohandSDK()
+        sdk._started = True
+        with (
+            patch.object(sdk._client, "get_autoresearch_history", new_callable=AsyncMock, return_value={"success": True, "attempts": []}),
+            patch.object(sdk._client, "get_autoresearch_pareto", new_callable=AsyncMock, return_value={"success": True, "attemptIds": ["a1"]}),
+            patch.object(sdk._client, "prune_autoresearch", new_callable=AsyncMock, return_value={"success": True, "applied": False, "candidates": [], "bytesFreed": 0, "remainingBytes": 12}),
+        ):
+            history = await sdk.get_autoresearch_history()
+            pareto = await sdk.get_autoresearch_pareto()
+            prune = await sdk.prune_autoresearch(dry_run=True)
+
+        assert history.attempts == []
+        assert pareto.attempt_ids == ["a1"]
+        assert prune.remaining_bytes == 12
 
     @pytest.mark.asyncio
     async def test_respond_to_permission(self) -> None:

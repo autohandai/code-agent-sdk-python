@@ -4,6 +4,7 @@ This example demonstrates the simplest possible usage of the Autohand SDK
 to send a prompt and receive a response.
 """
 import asyncio
+import os
 
 from autohand_sdk import AutohandSDK
 
@@ -13,7 +14,9 @@ async def main() -> None:
     # Create SDK instance with default configuration
     sdk = AutohandSDK(
         cwd=".",
-        model="fantail2",
+        provider="autohandai",
+        model="fantail",
+        api_key=os.environ["AUTOHAND_AI_API_KEY"],
     )
 
     try:

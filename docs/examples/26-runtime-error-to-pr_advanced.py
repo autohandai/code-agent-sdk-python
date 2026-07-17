@@ -23,6 +23,7 @@ from autohand_sdk import AutohandSDK
 
 @dataclass(frozen=True)
 class GitHubCredentials:
+    """GitHub authentication and repository hints for the workflow."""
     token_env_name: str
     remote: str
     base_branch: str
@@ -31,6 +32,7 @@ class GitHubCredentials:
 
 @dataclass(frozen=True)
 class IncidentPacket:
+    """Normalized production incident input for the repair workflow."""
     id: str
     severity: str
     service: str
@@ -118,6 +120,7 @@ def capture_incident_packet() -> IncidentPacket:
 
 
 def build_prompt(incident: IncidentPacket, github: GitHubCredentials) -> str:
+    """Build the constrained repair prompt from incident and GitHub context."""
     repo_hint = (
         f"- GitHub repository hint: {github.repository}."
         if github.repository
@@ -154,6 +157,7 @@ def build_prompt(incident: IncidentPacket, github: GitHubCredentials) -> str:
 
 
 async def main() -> None:
+    """Run the advanced runtime-error-to-PR workflow."""
     target_repo = os.environ.get("AUTOHAND_TARGET_REPO", ".")
     github = github_credentials_from_env()
     prompt = build_prompt(capture_incident_packet(), github)

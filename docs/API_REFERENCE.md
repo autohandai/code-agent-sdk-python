@@ -28,9 +28,10 @@ Common keyword arguments:
 - `model`: model identifier.
 - `fallback_model`: fallback model if the CLI/provider supports fallback behavior.
 - `temperature`: sampling temperature, `0.0` through `2.0`.
-- `provider`: provider name, such as `openrouter`, `openai`, `anthropic`, `azure`, or `ollama`.
+- `provider`: provider name, such as `autohandai`, `openrouter`, `openai`, `anthropic`, `azure`, or `ollama`.
 - `api_key`: provider API key.
 - `base_url`: provider base URL.
+- `autohand_ai_plan`: Autohand AI execution style, `cloud` or `local`.
 - `openai_auth_mode`, `reasoning_effort`, `chatgpt_access_token`, `chatgpt_account_id`: OpenAI-specific settings.
 - `azure_auth_method`, `azure_tenant_id`, `azure_client_id`, `azure_client_secret`, `azure_resource_name`, `azure_deployment_name`: Azure-specific settings.
 - `auto_mode`: start CLI with `--auto-mode`.
@@ -52,9 +53,16 @@ Common keyword arguments:
 The constructor accepts either a `SDKConfig` instance or keyword arguments:
 
 ```python
+import os
+
 from autohand_sdk import SDKConfig, AutohandSDK
 
-config = SDKConfig(cwd=".", model="fantail2")
+config = SDKConfig(
+    cwd=".",
+    provider="autohandai",
+    model="fantail",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
+)
 sdk = AutohandSDK(config, debug=True)
 ```
 
@@ -124,6 +132,37 @@ async for event in sdk.stream_prompt(
         print(event.get("delta", ""), end="", flush=True)
 ```
 
+## Autoresearch Ledger
+
+The autoresearch methods use the exact RPC methods exposed by the current CLI
+and return Pydantic result models. Python field names are snake_case; serialized
+RPC payloads and accepted CLI responses use lower camel case.
+
+| Method | Result | Purpose |
+| --- | --- | --- |
+| `start_autoresearch(objective, **options)` | `AutoresearchStartResult` | Initialize or resume a session and return its loop instruction. |
+| `get_autoresearch_status()` | `AutoresearchStatusResult` | Read active state, progress, attempts, and Pareto IDs. |
+| `stop_autoresearch()` | `AutoresearchStopResult` | Pause without deleting persisted state. |
+| `get_autoresearch_history()` | `AutoresearchHistoryResult` | List immutable attempts and materialization state. |
+| `replay_autoresearch(attempt_id, evaluator=None)` | `AutoresearchReplayResult` | Replay with the original or current evaluator. |
+| `rescore_autoresearch(attempt_id=..., all=...)` | `AutoresearchRescoreResult` | Append decisions using current policy. |
+| `compare_autoresearch(left_attempt_id, right_attempt_id)` | `AutoresearchCompareResult` | Compare samples, aggregates, checks, and decisions. |
+| `get_autoresearch_pareto()` | `AutoresearchParetoResult` | List constraint-passing non-dominated attempts. |
+| `pin_autoresearch(attempt_id, pinned)` | `AutoresearchPinResult` | Protect or release candidate artifacts. |
+| `prune_autoresearch(dry_run=None, yes=None)` | `AutoresearchPruneResult` | Preview or explicitly apply retention. |
+
+`start_autoresearch` accepts metric, benchmark/check command or script,
+in-scope files, subagent participation, secondary objectives, constraints,
+sampling, retention, and environment allowlist settings. The return value's
+`instruction` is intended to be passed to `stream_prompt` for normal streamed
+agent execution.
+
+Use `rescore_autoresearch(attempt_id="attempt-1")` for one attempt or
+`rescore_autoresearch(all=True)` for the full ledger. Passing neither or both is
+rejected before an RPC request is sent.
+
+See [autoresearch.md](autoresearch.md) for a complete workflow.
+
 ## Events
 
 Events are dictionaries. The raw camelCase RPC fields are preserved and common
@@ -145,6 +184,7 @@ Common event types:
 - `changes_batch_start`
 - `changes_batch_update`
 - `changes_batch_end`
+- `autoresearch` (`AutoresearchEvent` or `AutoresearchOperationEvent`)
 - `turn_end`
 - `agent_end`
 - `error`
@@ -199,7 +239,7 @@ Responds to a `permission_request` event.
 ### set_model
 
 ```python
-await sdk.set_model("fantail2")
+await sdk.set_model("fantail")
 ```
 
 Sends `autohand.modelSet` and updates the SDK config.

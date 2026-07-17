@@ -65,6 +65,10 @@ class TransportOptions:
     compression_threshold: float | None = None
     summarization_threshold: float | None = None
     copy_skill_files: bool = True
+    provider: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
+    autohand_ai_plan: str | None = None
     env_vars: dict[str, str] = field(default_factory=dict)
 
 
@@ -158,6 +162,12 @@ class Transport:
 
         env = dict(os.environ)
         env["AUTOHAND_STREAM_TOOL_OUTPUT"] = "1"
+        if self.options.provider == "autohandai":
+            env["AUTOHAND_AI_PLAN"] = self.options.autohand_ai_plan or "cloud"
+            if self.options.api_key:
+                env["AUTOHAND_AI_API_KEY"] = self.options.api_key
+            if self.options.base_url:
+                env["AUTOHAND_AI_BASE_URL"] = self.options.base_url
         env.update(self.options.env_vars)
 
         self._process = await asyncio.create_subprocess_exec(

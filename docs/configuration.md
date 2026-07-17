@@ -52,6 +52,7 @@ await sdk.set_model("openrouter/auto")
 | Provider | Config Key | Notes |
 |---|---|---|
 | OpenRouter | `openrouter` | Set `api_key` and optional `model`. |
+| Autohand AI | `autohandai` | SDK Cloud requires `api_key`; supports `AUTOHAND_AI_API_KEY`, `AUTOHAND_AI_BASE_URL`, and `AUTOHAND_AI_PLAN`. |
 | OpenAI | `openai` | Set `api_key` or use `chatgpt_access_token`. |
 | Azure | `azure` | Needs `azure_auth_method`, `azure_tenant_id`, `azure_client_id`, etc. |
 | Ollama | `ollama` | Local. Set `base_url` or `port` if not on 11434. |
@@ -59,6 +60,17 @@ await sdk.set_model("openrouter/auto")
 | MLX | `mlx` | Local. Set `port`. |
 
 The SDK auto-detects the provider from the model string when possible. Pass `provider` explicitly if auto-detection fails.
+
+Autohand AI Cloud uses `fantail` for ultra-fast coding with tool calls and `moa` for thinking with medium/high/xhigh effort through the OpenAI-compatible `https://api.autohand.ai/v1` endpoint. Unlike CLI Cloud account auth, SDK Cloud must pass an API key:
+
+```python
+sdk = AutohandSDK(
+    provider="autohandai",
+    model="moa",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
+    autohand_ai_plan="cloud",
+)
+```
 
 ## Execution Mode
 

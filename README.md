@@ -17,6 +17,9 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 - [Python](https://github.com/autohandai/code-agent-sdk-python) - this package, with `asyncio`, `async for` event streams, and typed Pydantic models.
 - [Java](https://github.com/autohandai/code-agent-sdk-java) - Java 21 records, sealed events, and virtual-thread-ready APIs.
 - [Swift](https://github.com/autohandai/code-agent-sdk-swift) - SwiftPM package with `Agent`, `Runner`, async streams, tools, hooks, and permissions.
+- [Rust](https://github.com/autohandai/code-agent-sdk-rust) - async Rust crate with Tokio, typed events, and stream-based runs.
+- [C++](https://github.com/autohandai/code-agent-sdk-cpp) - modern C++20 package with CMake targets and typed event callbacks.
+- [C#](https://github.com/autohandai/code-agent-sdk-csharp) - .NET package with `IAsyncEnumerable`, `CancellationToken`, and `System.Text.Json`.
 
 ## Features
 
@@ -25,6 +28,7 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 - **Skill support** - Configure skills by name or file path
 - **Event streaming** - Real-time JSON-RPC notifications from the agent
 - **Typed event parsing** - Optional Pydantic parsing for known event types
+- **Replayable autoresearch** - Typed lifecycle, history, replay, rescore, compare, Pareto, pin, and prune APIs
 - **Automatic cleanup** - Context manager support for resource management
 - **Production transport** - Response matching, notification routing, timeouts, and typed RPC errors
 - **90%+ test coverage** - Subprocess-backed transport and streaming tests
@@ -47,12 +51,15 @@ pip install autohand-sdk
 
 ```python
 import asyncio
+import os
 from autohand_sdk import AutohandSDK
 
 async def main():
     async with AutohandSDK(
         cwd=".",
-        model="fantail2",
+        provider="autohandai",
+        model="fantail",
+        api_key=os.environ["AUTOHAND_AI_API_KEY"],
     ) as sdk:
         async for event in sdk.stream_prompt("Hello, world!"):
             if event["type"] == "message_update":
@@ -72,7 +79,9 @@ Configure skills so the agent can reference them via `/skill <name>`:
 ```python
 sdk = AutohandSDK(
     cwd=".",
-    model="fantail2",
+    provider="autohandai",
+    model="fantail",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
     skill_refs=["typescript", "testing", "react"],
 )
 ```
@@ -84,7 +93,9 @@ Provide skills directly, including custom skill files:
 ```python
 sdk = AutohandSDK(
     cwd=".",
-    model="fantail2",
+    provider="autohandai",
+    model="fantail",
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
     skill_refs=[
         "typescript",                              # Built-in
         "./skills/my-custom/SKILL.md",             # Local file
@@ -104,11 +115,15 @@ already installed and do not want startup to write into `~/.autohand/skills`.
 ## Configuration
 
 ```python
+import os
+
 from autohand_sdk import AutohandSDK
 
 sdk = AutohandSDK(
     cwd=".",                         # Working directory
-    model="fantail2",                 # Model to use
+    provider="autohandai",            # Provider to use
+    model="fantail",                 # Model to use
+    api_key=os.environ["AUTOHAND_AI_API_KEY"],
     temperature=0.7,                  # Sampling temperature
     max_iterations=10,                # Max iterations in auto-mode
     startup_check=True,               # Probe CLI readiness on start
@@ -134,6 +149,41 @@ Full guides live in `docs/`:
 - `docs/plan-mode.md` - read-only planning and gated implementation.
 - `docs/memory.md` - CLI memory behavior through Python event streams.
 - `docs/sdlc-workflows.md` - discovery, gated implementation, and release-readiness flows.
+- `docs/autoresearch.md` - replayable `/autoresearch` lifecycle and experiment ledger.
+
+## Replayable Autoresearch
+
+The Python SDK exposes the same typed JSON-RPC autoresearch contract as the
+TypeScript v1.0.3 SDK. Start or resume a session, execute the returned loop
+instruction through the normal event stream, then inspect or replay its ledger:
+
+```python
+async with AutohandSDK(cwd=".", unrestricted=True) as sdk:
+    started = await sdk.start_autoresearch(
+        objective="Reduce test latency without changing behavior",
+        max_iterations=10,
+        metric_name="test_ms",
+        metric_unit="ms",
+        direction="lower",
+        measure_command="uv run pytest",
+        files_in_scope=["src", "tests"],
+    )
+    if not started.success:
+        raise RuntimeError(started.error or "autoresearch could not start")
+
+    if started.instruction:
+        async for event in sdk.stream_prompt(started.instruction):
+            if event["type"] == "autoresearch":
+                print(event)
+
+    history = await sdk.get_autoresearch_history()
+    pareto = await sdk.get_autoresearch_pareto()
+    await sdk.prune_autoresearch(dry_run=True)
+    await sdk.stop_autoresearch()
+```
+
+See [`docs/autoresearch.md`](docs/autoresearch.md) and
+[`docs/examples/27-autoresearch-ledger.py`](docs/examples/27-autoresearch-ledger.py).
 
 ### AutohandSDK
 
@@ -150,6 +200,10 @@ Main SDK class for interacting with the Autohand CLI.
 - `set_model(model)` - Change the model
 - `set_temperature(temperature)` - Set temperature
 - `get_account_info()` - Get account information
+- `start_autoresearch(...)` / `get_autoresearch_status()` / `stop_autoresearch()` - Manage the persisted experiment loop
+- `get_autoresearch_history()` / `replay_autoresearch(...)` / `rescore_autoresearch(...)` - Inspect and re-evaluate ledger entries
+- `compare_autoresearch(...)` / `get_autoresearch_pareto()` - Analyze candidate quality
+- `pin_autoresearch(...)` / `prune_autoresearch(...)` - Manage retained candidate artifacts
 
 #### Properties
 
@@ -170,6 +224,7 @@ The SDK emits events during agent execution:
 - `tool_end` - Tool execution completed
 - `permission_request` - Permission needed
 - `file_modified` - File mutation hook notification
+- `autoresearch` - Lifecycle or replay-ledger operation notification
 - `agent_end` - Agent finished
 - `error` - Error occurred
 

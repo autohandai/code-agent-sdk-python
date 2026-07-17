@@ -4,6 +4,7 @@ This example shows how to configure skills so the agent can reference
 them via /skill <name> in prompts. The SDK pre-loads the skills.
 """
 import asyncio
+import os
 
 from autohand_sdk import AutohandSDK
 
@@ -13,7 +14,9 @@ async def main() -> None:
     # Configure available skills
     sdk = AutohandSDK(
         cwd=".",
-        model="fantail2",
+        provider="autohandai",
+        model="fantail",
+        api_key=os.environ["AUTOHAND_AI_API_KEY"],
         skills=["typescript", "testing", "react"],
     )
 

@@ -4,6 +4,7 @@ This example shows how to provide skills directly, including custom skill
 files from local paths. The SDK copies the files to ~/.autohand/skills/.
 """
 import asyncio
+import os
 
 from autohand_sdk import AutohandSDK
 
@@ -13,7 +14,9 @@ async def main() -> None:
     # Mix of built-in skills and custom skill files
     sdk = AutohandSDK(
         cwd=".",
-        model="fantail2",
+        provider="autohandai",
+        model="fantail",
+        api_key=os.environ["AUTOHAND_AI_API_KEY"],
         skills=[
             "typescript",                           # Built-in skill
             "./skills/my-custom/SKILL.md",          # Local skill file

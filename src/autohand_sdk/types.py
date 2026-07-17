@@ -23,6 +23,7 @@ MAX_TEMPERATURE = 2.0
 class ProviderName(str, Enum):
     """Supported LLM providers."""
 
+    AUTOHANDAI = "autohandai"
     OPENROUTER = "openrouter"
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
@@ -52,6 +53,9 @@ class AutohandEnvVars(BaseModel):
     AUTOHAND_HOME: str | None = Field(None, description="Base directory for all Autohand user data")
     AUTOHAND_API_URL: str | None = Field(None, description="API base URL for authentication and sync services")
     AUTOHAND_CONFIG: str | None = Field(None, description="Config file path override")
+    AUTOHAND_AI_API_KEY: str | None = Field(None, description="Autohand AI API key for SDK Cloud usage")
+    AUTOHAND_AI_BASE_URL: str | None = Field(None, description="Autohand AI base URL override")
+    AUTOHAND_AI_PLAN: str | None = Field(None, description="Autohand AI plan style (cloud or local)")
     AUTOHAND_CLIENT_NAME: str | None = Field(None, description="Client identifier for ACP extensions (e.g., 'zed', 'terminal')")
     AUTOHAND_CLIENT_VERSION: str | None = Field(None, description="Client version string")
     AUTOHAND_CODE: str | None = Field(None, description="Auth code for headless setup")
@@ -87,6 +91,9 @@ def detect_provider_from_model(model: str) -> ProviderName | None:
         ProviderName.OPENROUTER
     """
     model_lower = model.lower()
+
+    if model_lower in {"fantail", "moa"} or model_lower.startswith("autohandai/"):
+        return ProviderName.AUTOHANDAI
 
     # OpenRouter patterns
     if model_lower.startswith("openrouter/") or model_lower.startswith("or/"):
@@ -170,7 +177,9 @@ def validate_provider_config(provider: ProviderName, config: SDKConfig) -> None:
         if config.openai_auth_mode == "api-key" and not config.api_key:
             raise ProviderConfigError("OpenAI provider with api-key auth mode requires 'api_key'")
 
-    # Add more provider-specific validation as needed
+    elif provider == ProviderName.AUTOHANDAI:
+        if config.autohand_ai_plan != "local" and not config.api_key:
+            raise ProviderConfigError("Autohand AI SDK Cloud usage requires 'api_key'")
 
 
 # =============================================================================
@@ -475,6 +484,374 @@ class McpServerConfig(BaseModel):
 
 
 # =============================================================================
+# Autoresearch Types
+# =============================================================================
+
+
+def _snake_to_camel(value: str) -> str:
+    """Convert a Python field name to the CLI's lower-camel-case spelling."""
+    head, *tail = value.split("_")
+    return head + "".join(part.capitalize() for part in tail)
+
+
+class AutoresearchModel(BaseModel):
+    """Base model for forward-compatible autoresearch RPC values."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+    )
+
+
+AutoresearchOptimizationDirection: TypeAlias = Literal["lower", "higher"]
+
+
+class AutoresearchSubagentOptions(AutoresearchModel):
+    """Optional subagent participation in an autoresearch loop."""
+
+    idea_generation: bool | None = None
+    measurement_analysis: bool | None = None
+    finalization: bool | None = None
+
+
+class AutoresearchSecondaryObjective(AutoresearchModel):
+    """A secondary metric optimized alongside the primary metric."""
+
+    name: str
+    unit: str
+    direction: AutoresearchOptimizationDirection
+
+
+class AutoresearchConstraint(AutoresearchModel):
+    """A deterministic acceptance constraint for an autoresearch metric."""
+
+    metric_name: str
+    operator: Literal["<", "<=", ">", ">="]
+    threshold: float
+
+
+class AutoresearchSamplingOptions(AutoresearchModel):
+    """Repeated-measurement sampling policy."""
+
+    min_samples: int | None = Field(None, gt=0)
+    max_samples: int | None = Field(None, gt=0)
+    confidence_threshold: float | None = Field(None, ge=0, le=1)
+
+
+class AutoresearchRetentionOptions(AutoresearchModel):
+    """Artifact retention limits for the replay ledger."""
+
+    max_artifact_bytes: int | None = Field(None, ge=0)
+    max_artifact_age_days: int | None = Field(None, ge=0)
+
+
+class AutoresearchStartParams(AutoresearchModel):
+    """Parameters used to initialize or resume autoresearch."""
+
+    objective: str
+    max_iterations: int | None = Field(None, gt=0)
+    timeout_ms: int | None = Field(None, gt=0)
+    metric_name: str | None = None
+    metric_unit: str | None = None
+    direction: AutoresearchOptimizationDirection | None = None
+    measure_command: str | None = None
+    measure_script: str | None = None
+    checks_command: str | None = None
+    checks_script: str | None = None
+    files_in_scope: list[str] | None = None
+    subagents: AutoresearchSubagentOptions | None = None
+    secondary_objectives: list[AutoresearchSecondaryObjective] | None = None
+    constraints: list[AutoresearchConstraint] | None = None
+    sampling: AutoresearchSamplingOptions | None = None
+    retention: AutoresearchRetentionOptions | None = None
+    environment_allowlist: list[str] | None = None
+
+
+class AutoresearchMetricAggregate(AutoresearchModel):
+    """Robust aggregate for one measured metric."""
+
+    median: float
+    mad: float
+    sample_count: int
+
+
+class AutoresearchEvaluationSample(AutoresearchModel):
+    """One immutable benchmark sample."""
+
+    sequence: int
+    metrics: dict[str, float]
+    output_object: str
+    duration_ms: int
+    timestamp: str
+
+
+class AutoresearchChecksResult(AutoresearchModel):
+    """Deterministic checks attached to an evaluation."""
+
+    passed: bool
+    output_object: str | None = None
+
+
+class AutoresearchExecutionResult(AutoresearchModel):
+    """Execution outcome attached to an evaluation."""
+
+    outcome: Literal["passed", "benchmark_failed", "checks_failed", "cancelled"]
+    error: str | None = None
+    output_object: str | None = None
+
+
+class AutoresearchEvaluationRecord(AutoresearchModel):
+    """Immutable replayable evaluation record."""
+
+    schema_version: Literal[1]
+    type: Literal["evaluation"]
+    id: str
+    attempt_id: str
+    timestamp: str
+    context: dict[str, object]
+    evaluator_mode: Literal["original", "current"]
+    samples: list[AutoresearchEvaluationSample]
+    aggregates: dict[str, AutoresearchMetricAggregate]
+    checks: AutoresearchChecksResult
+    execution: AutoresearchExecutionResult
+    drift_warnings: list[str]
+
+
+class AutoresearchConstraintResult(AutoresearchConstraint):
+    """Observed result for a configured acceptance constraint."""
+
+    conservative_value: float
+    passed: bool
+    conclusive: bool
+
+
+class AutoresearchDecisionRecord(AutoresearchModel):
+    """Immutable policy decision derived from an evaluation."""
+
+    schema_version: Literal[1]
+    type: Literal["decision"]
+    id: str
+    attempt_id: str
+    timestamp: str
+    context: dict[str, object]
+    policy_version: str
+    evaluation_id: str
+    source: Literal["original", "replay", "rescore"]
+    constraint_results: list[AutoresearchConstraintResult]
+    primary_improvement: float
+    confidence: float
+    outcome: Literal["accepted", "rejected", "inconclusive", "checks_failed", "crashed"]
+    materialized: bool
+    explanation: str
+
+
+AutoresearchMaterializationState: TypeAlias = Literal[
+    "baseline", "committed", "retained", "reverted", "none"
+]
+
+
+class AutoresearchHistoryAttempt(AutoresearchModel):
+    """An attempt listed in the replayable autoresearch history."""
+
+    attempt_id: str
+    description: str
+    timestamp: str
+    legacy: bool
+    replayable: bool
+    pinned: bool
+    latest_evaluation: AutoresearchEvaluationRecord | None = None
+    latest_decision: AutoresearchDecisionRecord | None = None
+    materialization: AutoresearchMaterializationState
+
+
+class AutoresearchState(AutoresearchModel):
+    """Persisted state for an autoresearch session."""
+
+    active: bool
+    goal: str
+    iteration: int
+    max_iterations: int
+
+
+class AutoresearchStartResult(AutoresearchModel):
+    """Result from initializing or resuming autoresearch."""
+
+    success: bool
+    message: str | None = None
+    instruction: str | None = None
+    active: bool | None = None
+    state: AutoresearchState | None = None
+    status_text: str | None = None
+    runs_logged: int | None = None
+    attempts: list[AutoresearchHistoryAttempt] | None = None
+    pareto_attempt_ids: list[str] | None = None
+    error: str | None = None
+
+
+class AutoresearchStatusResult(AutoresearchModel):
+    """Current autoresearch status and ledger summary."""
+
+    success: bool
+    active: bool
+    state: AutoresearchState | None = None
+    status_text: str
+    runs_logged: int
+    attempts: list[AutoresearchHistoryAttempt] | None = None
+    pareto_attempt_ids: list[str] | None = None
+    error: str | None = None
+
+
+class AutoresearchStopResult(AutoresearchModel):
+    """Result from pausing autoresearch without deleting state."""
+
+    success: bool
+    message: str | None = None
+    active: bool | None = None
+    state: AutoresearchState | None = None
+    status_text: str | None = None
+    runs_logged: int | None = None
+    attempts: list[AutoresearchHistoryAttempt] | None = None
+    pareto_attempt_ids: list[str] | None = None
+    error: str | None = None
+
+
+class AutoresearchHistoryResult(AutoresearchModel):
+    """Result containing all immutable autoresearch attempts."""
+
+    success: bool
+    attempts: list[AutoresearchHistoryAttempt]
+    error: str | None = None
+
+
+class AutoresearchReplayParams(AutoresearchModel):
+    """Parameters for replaying an attempt in an isolated worktree."""
+
+    attempt_id: str
+    evaluator: Literal["original", "current"] | None = None
+
+
+class AutoresearchReplayResult(AutoresearchModel):
+    """Result from replaying one autoresearch attempt."""
+
+    success: bool
+    attempt_id: str | None = None
+    evaluator_mode: Literal["original", "current"] | None = None
+    metrics: dict[str, float] | None = None
+    samples: list[AutoresearchEvaluationSample] | None = None
+    decision: AutoresearchDecisionRecord | None = None
+    drift_warnings: list[str] | None = None
+    error: str | None = None
+
+
+class AutoresearchRescoreParams(AutoresearchModel):
+    """Parameters for rescoring either one attempt or the complete ledger."""
+
+    attempt_id: str | None = None
+    all: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_target(self) -> AutoresearchRescoreParams:
+        """Require exactly one of ``attempt_id`` or ``all=True``."""
+        if (self.attempt_id is None) == (self.all is not True):
+            raise ValueError("Provide exactly one of 'attempt_id' or 'all=True'")
+        return self
+
+
+class AutoresearchRescoreResult(AutoresearchModel):
+    """Result from applying current policy to stored measurements."""
+
+    success: bool
+    decisions: list[AutoresearchDecisionRecord]
+    error: str | None = None
+
+
+class AutoresearchCompareParams(AutoresearchModel):
+    """Parameters for comparing two autoresearch attempts."""
+
+    left_attempt_id: str
+    right_attempt_id: str
+
+
+class AutoresearchComparisonSide(AutoresearchModel):
+    """One side of an autoresearch comparison."""
+
+    attempt_id: str
+    samples: list[AutoresearchEvaluationSample]
+    aggregates: dict[str, AutoresearchMetricAggregate]
+    checks: AutoresearchChecksResult
+    execution: AutoresearchExecutionResult
+    decision: AutoresearchDecisionRecord | None = None
+
+
+class AutoresearchComparison(AutoresearchModel):
+    """Side-by-side comparison of two attempts."""
+
+    left: AutoresearchComparisonSide
+    right: AutoresearchComparisonSide
+
+
+class AutoresearchCompareResult(AutoresearchModel):
+    """Result from comparing two attempts."""
+
+    success: bool
+    comparison: AutoresearchComparison | None = None
+    error: str | None = None
+
+
+class AutoresearchParetoResult(AutoresearchModel):
+    """Constraint-passing, non-dominated attempt identifiers."""
+
+    success: bool
+    attempt_ids: list[str]
+    error: str | None = None
+
+
+class AutoresearchPinParams(AutoresearchModel):
+    """Parameters for changing an attempt's retention pin."""
+
+    attempt_id: str
+    pinned: bool
+
+
+class AutoresearchPinResult(AutoresearchModel):
+    """Result from changing an attempt's retention pin."""
+
+    success: bool
+    attempt_id: str
+    pinned: bool
+    error: str | None = None
+
+
+class AutoresearchPruneParams(AutoresearchModel):
+    """Parameters for previewing or applying artifact pruning."""
+
+    dry_run: bool | None = None
+    yes: bool | None = None
+
+
+class AutoresearchPruneCandidate(AutoresearchModel):
+    """One candidate in an autoresearch artifact prune plan."""
+
+    attempt_id: str
+    objects: list[str]
+    bytes: int
+    protected: bool
+    reason: str
+
+
+class AutoresearchPruneResult(AutoresearchModel):
+    """Result from previewing or applying artifact pruning."""
+
+    success: bool
+    applied: bool
+    candidates: list[AutoresearchPruneCandidate]
+    bytes_freed: int
+    remaining_bytes: int
+    error: str | None = None
+
+
+# =============================================================================
 # Event Types
 # =============================================================================
 
@@ -575,6 +952,40 @@ class ErrorEvent(BaseModel):
     details: dict[str, Any] | None = None
 
 
+class AutoresearchEvent(AutoresearchModel):
+    """Autoresearch session lifecycle notification."""
+
+    type: Literal["autoresearch"] = "autoresearch"
+    phase: Literal["start", "status", "pause"]
+    active: bool
+    goal: str | None = None
+    iteration: int | None = None
+    max_iterations: int | None = None
+    runs_logged: int
+    status_text: str
+    subcommand: Literal["start", "resume", "status", "stop"]
+    message: str | None = None
+    timestamp: str
+
+
+AutoresearchOperation: TypeAlias = Literal[
+    "history", "replay", "rescore", "compare", "pareto", "pin", "prune"
+]
+
+
+class AutoresearchOperationEvent(AutoresearchModel):
+    """Notification emitted by a replay-ledger operation."""
+
+    type: Literal["autoresearch"] = "autoresearch"
+    operation: AutoresearchOperation
+    phase: Literal["started", "completed", "failed"]
+    attempt_id: str | None = None
+    success: bool
+    applied: bool | None = None
+    error: str | None = None
+    timestamp: str
+
+
 TypedSDKEvent: TypeAlias = (
     AgentStartEvent
     | AgentEndEvent
@@ -584,6 +995,8 @@ TypedSDKEvent: TypeAlias = (
     | ToolUpdateEvent
     | ToolEndEvent
     | PermissionRequestEvent
+    | AutoresearchEvent
+    | AutoresearchOperationEvent
     | ErrorEvent
 )
 SDKEvent: TypeAlias = dict[str, Any]
@@ -609,7 +1022,12 @@ def parse_sdk_event(event: SDKEvent) -> TypedSDKEvent | SDKEvent:
     access to new CLI notifications.
     """
     event_type = event.get("type")
-    model = EVENT_MODEL_BY_TYPE.get(event_type) if isinstance(event_type, str) else None
+    if event_type == "autoresearch":
+        model: type[BaseModel] | None = (
+            AutoresearchOperationEvent if "operation" in event else AutoresearchEvent
+        )
+    else:
+        model = EVENT_MODEL_BY_TYPE.get(event_type) if isinstance(event_type, str) else None
     if model is None:
         return event
     try:
@@ -746,6 +1164,7 @@ class SDKConfig(BaseModel):
     provider: ProviderName | None = Field(None, description="Provider name (if not provided, auto-detected from model ID)")
     api_key: str | None = Field(None, description="API key for the provider")
     base_url: str | None = Field(None, description="Base URL for the provider API")
+    autohand_ai_plan: Literal["cloud", "local"] | None = Field(None, description="Autohand AI plan style")
 
     # OpenAI-specific options
     openai_auth_mode: Literal["api-key", "chatgpt"] | None = Field(None, description="OpenAI authentication mode")

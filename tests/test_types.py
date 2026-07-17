@@ -6,6 +6,10 @@ from pydantic import ValidationError
 
 from autohand_sdk.types import (
     AgentsMdSettings,
+    AutoresearchEvent,
+    AutoresearchOperationEvent,
+    AutoresearchRescoreParams,
+    AutoresearchStartParams,
     ProviderConfigError,
     ProviderName,
     SDKConfig,
@@ -53,6 +57,11 @@ class TestProviderDetection:
     def test_detect_deepseek(self) -> None:
         assert detect_provider_from_model("deepseek-chat") == ProviderName.DEEPSEEK
 
+    def test_detect_autohandai(self) -> None:
+        assert detect_provider_from_model("fantail") == ProviderName.AUTOHANDAI
+        assert detect_provider_from_model("moa") == ProviderName.AUTOHANDAI
+        assert detect_provider_from_model("autohandai/moa") == ProviderName.AUTOHANDAI
+
     def test_detect_unknown(self) -> None:
         assert detect_provider_from_model("unknown-model") is None
 
@@ -81,6 +90,20 @@ class TestProviderValidation:
         with pytest.raises(ProviderConfigError) as exc_info:
             validate_provider_config(ProviderName.OPENAI, config)
         assert "api_key" in str(exc_info.value)
+
+    def test_validate_autohandai_requires_api_key_for_sdk_cloud(self) -> None:
+        config = SDKConfig(model="fantail", provider=ProviderName.AUTOHANDAI)
+        with pytest.raises(ProviderConfigError) as exc_info:
+            validate_provider_config(ProviderName.AUTOHANDAI, config)
+        assert "api_key" in str(exc_info.value)
+
+    def test_validate_autohandai_local_does_not_require_api_key(self) -> None:
+        config = SDKConfig(
+            model="mlx-community/Qwen2.5-Coder-7B-Instruct-4bit",
+            provider=ProviderName.AUTOHANDAI,
+            autohand_ai_plan="local",
+        )
+        validate_provider_config(ProviderName.AUTOHANDAI, config)
 
 
 class TestSkillReference:
@@ -127,8 +150,8 @@ class TestSDKConfig:
         assert config.model is None
 
     def test_config_with_model(self) -> None:
-        config = SDKConfig(model="fantail2")
-        assert config.model == "fantail2"
+        config = SDKConfig(model="fantail")
+        assert config.model == "fantail"
 
     def test_config_auto_detects_provider(self) -> None:
         config = SDKConfig(model="openrouter/quasar-alpha")
@@ -185,6 +208,81 @@ class TestSDKEvents:
     def test_parse_unknown_event_returns_raw_dict(self) -> None:
         raw = {"type": "future_event", "value": 1}
         assert parse_sdk_event(raw) is raw
+
+    def test_parse_autoresearch_lifecycle_event(self) -> None:
+        event = parse_sdk_event(
+            {
+                "type": "autoresearch",
+                "phase": "status",
+                "active": True,
+                "goal": "Improve latency",
+                "iteration": 2,
+                "maxIterations": 10,
+                "runsLogged": 3,
+                "statusText": "Running experiment 3",
+                "subcommand": "status",
+                "timestamp": "2026-07-17T00:00:00Z",
+            }
+        )
+
+        assert isinstance(event, AutoresearchEvent)
+        assert event.max_iterations == 10
+        assert event.runs_logged == 3
+
+    def test_parse_autoresearch_operation_event(self) -> None:
+        event = parse_sdk_event(
+            {
+                "type": "autoresearch",
+                "operation": "replay",
+                "phase": "completed",
+                "attemptId": "attempt-1",
+                "success": True,
+                "timestamp": "2026-07-17T00:00:00Z",
+            }
+        )
+
+        assert isinstance(event, AutoresearchOperationEvent)
+        assert event.attempt_id == "attempt-1"
+
+
+class TestAutoresearchTypes:
+    """Tests for replayable autoresearch RPC contracts."""
+
+    def test_start_params_serialize_to_rpc_camel_case(self) -> None:
+        params = AutoresearchStartParams(
+            objective="Reduce test latency",
+            max_iterations=12,
+            timeout_ms=600_000,
+            metric_name="test_ms",
+            metric_unit="ms",
+            direction="lower",
+            measure_command="uv run pytest",
+            files_in_scope=["src", "tests"],
+            subagents={"ideaGeneration": True},
+            sampling={"minSamples": 3, "maxSamples": 7},
+        )
+
+        assert params.model_dump(by_alias=True, exclude_none=True) == {
+            "objective": "Reduce test latency",
+            "maxIterations": 12,
+            "timeoutMs": 600_000,
+            "metricName": "test_ms",
+            "metricUnit": "ms",
+            "direction": "lower",
+            "measureCommand": "uv run pytest",
+            "filesInScope": ["src", "tests"],
+            "subagents": {"ideaGeneration": True},
+            "sampling": {"minSamples": 3, "maxSamples": 7},
+        }
+
+    def test_rescore_params_require_exactly_one_target(self) -> None:
+        assert AutoresearchRescoreParams(attempt_id="attempt-1").attempt_id == "attempt-1"
+        assert AutoresearchRescoreParams(all=True).all is True
+
+        with pytest.raises(ValidationError):
+            AutoresearchRescoreParams()
+        with pytest.raises(ValidationError):
+            AutoresearchRescoreParams(attempt_id="attempt-1", all=True)
 
 
 class TestToolEnum:
