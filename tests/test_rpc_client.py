@@ -530,6 +530,26 @@ class TestRPCClientMethods:
         assert operation["operation"] == "replay"
         assert operation["attempt_id"] == "attempt-1"
 
+    def test_maps_turn_end_usage_fields(self) -> None:
+        client = RPCClient()
+        client._handle_notification(
+            {
+                "_method": "autohand.turnEnd",
+                "turnId": "turn-1",
+                "tokensUsed": 42,
+                "tokensUsageStatus": "actual",
+                "durationMs": 125,
+                "contextPercent": 12.5,
+            }
+        )
+
+        event = client._event_queue.get_nowait()
+        assert event["type"] == "turn_end"
+        assert event["tokens_used"] == 42
+        assert event["tokens_usage_status"] == "actual"
+        assert event["duration_ms"] == 125
+        assert event["context_percent"] == 12.5
+
 
 class TestRPCClientIsRunning:
     """Tests for is_running method."""

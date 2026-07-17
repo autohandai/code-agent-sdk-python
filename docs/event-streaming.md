@@ -84,6 +84,11 @@ if event["type"] == "error":
     print("Agent error:", event.get("message"))
 ```
 
+### turn_end
+
+The completed turn includes `tokens_used`, `tokens_usage_status`, `duration_ms`,
+and `context_percent` when the CLI reports them.
+
 ## Building a Simple Chat UI
 
 ```python
