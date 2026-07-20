@@ -34,6 +34,7 @@ RPC_METHODS = {
     "automode_cancel": "autohand.automode.cancel",
     "automode_get_log": "autohand.automode.getLog",
     "permission_response": "autohand.permissionResponse",
+    "permission_acknowledged": "autohand.permissionAcknowledged",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -463,6 +464,16 @@ class RPCClient:
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:
         """Respond to a permission request."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["permission_response"], params))
+
+    async def acknowledge_permission(self, request_id: str) -> dict[str, Any]:
+        """Acknowledge receipt of a permission request before deciding it."""
+        return cast(
+            dict[str, Any],
+            await self._request(
+                RPC_METHODS["permission_acknowledged"],
+                {"requestId": request_id},
+            ),
+        )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Get the agent state."""

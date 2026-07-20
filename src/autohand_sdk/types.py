@@ -1353,6 +1353,29 @@ class RPCContractModel(BaseModel):
     )
 
 
+class StrictRPCContractModel(RPCContractModel):
+    """Lower-camel RPC contract that rejects coercion at the CLI trust boundary."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+        strict=True,
+    )
+
+
+class PermissionAcknowledgedParams(StrictRPCContractModel):
+    """Parameters for acknowledging receipt of a permission request."""
+
+    request_id: str = Field(..., min_length=1)
+
+
+class PermissionAcknowledgedResult(StrictRPCContractModel):
+    """Result returned after a permission request is acknowledged."""
+
+    success: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

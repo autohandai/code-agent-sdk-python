@@ -23,6 +23,7 @@ from autohand_sdk.types import (
     McpGetServerConfigsResult,
     McpListServersResult,
     McpListToolsResult,
+    PermissionAcknowledgedResult,
     PromptResult,
     ResetResult,
     SDKConfig,
@@ -59,6 +60,10 @@ class Agent:
     async def reset(self) -> ResetResult:
         """Reset the conversation context."""
         return await self._sdk.reset()
+
+    async def acknowledge_permission(self, request_id: str) -> PermissionAcknowledgedResult:
+        """Acknowledge receipt of a permission request before deciding it."""
+        return await self._sdk.acknowledge_permission(request_id)
 
     async def create_browser_handoff(
         self,

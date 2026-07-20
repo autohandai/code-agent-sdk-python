@@ -62,6 +62,8 @@ __all__ = [
     "GetMessagesParams",
     "GetMessagesResult",
     "PermissionResponseParams",
+    "PermissionAcknowledgedParams",
+    "PermissionAcknowledgedResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",

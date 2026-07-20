@@ -66,6 +66,8 @@ from autohand_sdk.types import (
     McpGetServerConfigsResult,
     McpListServersResult,
     McpListToolsResult,
+    PermissionAcknowledgedParams,
+    PermissionAcknowledgedResult,
     PermissionResponseParams,
     PromptParams,
     PromptResult,
@@ -429,6 +431,14 @@ class AutohandSDK:
         return await self._client.respond_to_permission(
             params.model_dump(by_alias=True, exclude_none=True)
         )
+
+    async def acknowledge_permission(self, request_id: str) -> PermissionAcknowledgedResult:
+        """Acknowledge receipt of a permission request before deciding it."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = PermissionAcknowledgedParams(request_id=request_id)
+        result = await self._client.acknowledge_permission(params.request_id)
+        return PermissionAcknowledgedResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.
