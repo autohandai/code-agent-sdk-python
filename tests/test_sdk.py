@@ -8,6 +8,7 @@ import pytest
 
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
+    AutomodeGetLogResult,
     AutomodeOperationResult,
     AutomodeStartResult,
     AutomodeStatusResult,
@@ -485,6 +486,39 @@ class TestSDKMethods:
             {"reason": "Superseded"},
         )
         assert result == AutomodeOperationResult(success=True)
+
+    @pytest.mark.asyncio
+    async def test_get_automode_log_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {
+            "success": True,
+            "iterations": [
+                {
+                    "iteration": 3,
+                    "timestamp": "2026-07-20T00:03:00.000Z",
+                    "actions": ["Edited src/app.py", "Ran tests"],
+                    "tokensUsed": 1_200,
+                    "cost": 0.42,
+                    "checkpoint": {
+                        "commit": "def456",
+                        "message": "iteration 3",
+                    },
+                }
+            ],
+        }
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.get_automode_log(limit=5)
+
+        request.assert_awaited_once_with("autohand.automode.getLog", {"limit": 5})
+        assert result == AutomodeGetLogResult.model_validate(wire_result)
+        assert result.iterations[0].tokens_used == 1_200
+        assert result.iterations[0].checkpoint is not None
+        assert result.iterations[0].checkpoint.commit == "def456"
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:

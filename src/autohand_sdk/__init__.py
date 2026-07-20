@@ -83,6 +83,10 @@ __all__ = [
     "AutomodeResumeResult",
     "AutomodeCancelParams",
     "AutomodeCancelResult",
+    "AutomodeGetLogParams",
+    "AutomodeLogCheckpoint",
+    "AutomodeIterationLog",
+    "AutomodeGetLogResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

@@ -32,6 +32,7 @@ RPC_METHODS = {
     "automode_pause": "autohand.automode.pause",
     "automode_resume": "autohand.automode.resume",
     "automode_cancel": "autohand.automode.cancel",
+    "automode_get_log": "autohand.automode.getLog",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -449,6 +450,14 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["automode_cancel"], params),
+        )
+
+    async def get_automode_log(self, limit: int | None = None) -> dict[str, Any]:
+        """Get auto-mode iteration log entries."""
+        params = {} if limit is None else {"limit": limit}
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["automode_get_log"], params),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:

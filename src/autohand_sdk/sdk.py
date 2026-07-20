@@ -15,6 +15,8 @@ from autohand_sdk.types import (
     AbortResult,
     AutomodeCancelParams,
     AutomodeCancelResult,
+    AutomodeGetLogParams,
+    AutomodeGetLogResult,
     AutomodeOperationResult,
     AutomodeResumeResult,
     AutomodeStartParams,
@@ -384,6 +386,15 @@ class AutohandSDK:
         params = AutomodeCancelParams(reason=reason)
         result = await self._client.cancel_automode(params.reason)
         return AutomodeOperationResult.model_validate(result)
+
+    async def get_automode_log(self, limit: int | None = None) -> AutomodeGetLogResult:
+        """Get auto-mode iteration log entries."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = AutomodeGetLogParams(limit=limit)
+        result = await self._client.get_automode_log(params.limit)
+        return AutomodeGetLogResult.model_validate(result)
 
     async def respond_to_permission(
         self,

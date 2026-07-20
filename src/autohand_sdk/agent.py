@@ -7,6 +7,7 @@ from typing import Any, Literal
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
     AutomodeCancelResult,
+    AutomodeGetLogResult,
     AutomodeOperationResult,
     AutomodeResumeResult,
     AutomodeStartResult,
@@ -112,6 +113,10 @@ class Agent:
     async def cancel_automode(self, reason: str | None = None) -> AutomodeCancelResult:
         """Cancel the active autonomous execution session."""
         return await self._sdk.cancel_automode(reason)
+
+    async def get_automode_log(self, limit: int | None = None) -> AutomodeGetLogResult:
+        """Get auto-mode iteration log entries."""
+        return await self._sdk.get_automode_log(limit)
 
     async def command(
         self,

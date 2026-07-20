@@ -1492,6 +1492,38 @@ class AutomodeCancelParams(RPCContractModel):
 AutomodeCancelResult: TypeAlias = AutomodeOperationResult
 
 
+class AutomodeGetLogParams(RPCContractModel):
+    """Parameters for reading auto-mode iteration logs."""
+
+    limit: int | None = None
+
+
+class AutomodeLogCheckpoint(RPCContractModel):
+    """Checkpoint recorded for one auto-mode iteration."""
+
+    commit: str
+    message: str
+
+
+class AutomodeIterationLog(RPCContractModel):
+    """One auto-mode iteration log entry."""
+
+    iteration: int
+    timestamp: str
+    actions: list[str]
+    tokens_used: int | None = None
+    cost: int | float | None = None
+    checkpoint: AutomodeLogCheckpoint | None = None
+
+
+class AutomodeGetLogResult(RPCContractModel):
+    """Result containing auto-mode iteration log entries."""
+
+    success: bool
+    iterations: list[AutomodeIterationLog]
+    error: str | None = None
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

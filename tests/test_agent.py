@@ -134,6 +134,16 @@ async def test_cancel_automode_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_automode_log_delegates_to_sdk() -> None:
+    """Agent exposes autonomous execution logs."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.get_automode_log = AsyncMock(return_value="log")
+
+    assert await Agent.from_sdk(sdk).get_automode_log(5) == "log"
+    sdk.get_automode_log.assert_awaited_once_with(5)
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)
