@@ -14,6 +14,7 @@ from autohand_sdk.types import (
     AbortParams,
     AbortResult,
     AutomodeOperationResult,
+    AutomodeResumeResult,
     AutomodeStartParams,
     AutomodeStartResult,
     AutomodeStatusResult,
@@ -363,6 +364,14 @@ class AutohandSDK:
             raise RuntimeError("SDK not started")
 
         result = await self._client.pause_automode()
+        return AutomodeOperationResult.model_validate(result)
+
+    async def resume_automode(self) -> AutomodeResumeResult:
+        """Resume a paused autonomous execution session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        result = await self._client.resume_automode()
         return AutomodeOperationResult.model_validate(result)
 
     async def respond_to_permission(

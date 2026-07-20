@@ -114,6 +114,16 @@ async def test_pause_automode_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resume_automode_delegates_to_sdk() -> None:
+    """Agent exposes autonomous execution resume."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.resume_automode = AsyncMock(return_value="resumed")
+
+    assert await Agent.from_sdk(sdk).resume_automode() == "resumed"
+    sdk.resume_automode.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

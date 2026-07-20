@@ -456,6 +456,20 @@ class TestSDKMethods:
         )
 
     @pytest.mark.asyncio
+    async def test_resume_automode_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"success": True},
+        ) as request:
+            result = await sdk.resume_automode()
+
+        request.assert_awaited_once_with("autohand.automode.resume", {})
+        assert result == AutomodeOperationResult(success=True)
+
+    @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:
         sdk = AutohandSDK()
         sdk._client = None

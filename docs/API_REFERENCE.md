@@ -197,6 +197,9 @@ counts, branch, and a typed latest checkpoint.
 returns `AutomodeOperationResult`. A rejected operation remains a typed
 `success=False` result with the optional CLI error.
 
+`resume_automode()` calls `autohand.automode.resume` with no parameters and
+returns the same operation-result shape.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

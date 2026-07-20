@@ -1476,6 +1476,13 @@ class AutomodeOperationResult(RPCContractModel):
     error: str | None = None
 
 
+class AutomodeResumeParams(RPCContractModel):
+    """Parameters for resuming auto-mode."""
+
+
+AutomodeResumeResult: TypeAlias = AutomodeOperationResult
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 
