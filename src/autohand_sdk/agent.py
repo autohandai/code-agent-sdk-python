@@ -15,6 +15,8 @@ from autohand_sdk.types import (
     BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
+    ChangesDecisionAction,
+    ChangesDecisionResult,
     DirectoryAccessAcknowledgedResult,
     DirectoryAccessResponseResult,
     GetSkillsRegistryResult,
@@ -78,6 +80,20 @@ class Agent:
     ) -> DirectoryAccessAcknowledgedResult:
         """Acknowledge receipt of a directory-access request."""
         return await self._sdk.acknowledge_directory_access(request_id)
+
+    async def decide_changes(
+        self,
+        batch_id: str,
+        action: ChangesDecisionAction,
+        *,
+        selected_change_ids: list[str] | None = None,
+    ) -> ChangesDecisionResult:
+        """Apply or reject a batch of proposed file changes."""
+        return await self._sdk.decide_changes(
+            batch_id,
+            action,
+            selected_change_ids=selected_change_ids,
+        )
 
     async def create_browser_handoff(
         self,

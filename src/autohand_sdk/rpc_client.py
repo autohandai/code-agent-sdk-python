@@ -37,6 +37,7 @@ RPC_METHODS = {
     "permission_acknowledged": "autohand.permissionAcknowledged",
     "directory_access_response": "autohand.directoryAccessResponse",
     "directory_access_acknowledged": "autohand.directoryAccessAcknowledged",
+    "changes_decision": "autohand.changesDecision",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -495,6 +496,13 @@ class RPCClient:
                 RPC_METHODS["directory_access_acknowledged"],
                 {"requestId": request_id},
             ),
+        )
+
+    async def decide_changes(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Apply or reject a batch of proposed file changes."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["changes_decision"], params),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -48,6 +48,9 @@ from autohand_sdk.types import (
     BrowserHandoffAttachResult,
     BrowserHandoffCreateParams,
     BrowserHandoffCreateResult,
+    ChangesDecisionAction,
+    ChangesDecisionParams,
+    ChangesDecisionResult,
     CreateGoalParams,
     DirectoryAccessAcknowledgedParams,
     DirectoryAccessAcknowledgedResult,
@@ -463,6 +466,26 @@ class AutohandSDK:
         params = DirectoryAccessAcknowledgedParams(request_id=request_id)
         result = await self._client.acknowledge_directory_access(params.request_id)
         return DirectoryAccessAcknowledgedResult.model_validate(result)
+
+    async def decide_changes(
+        self,
+        batch_id: str,
+        action: ChangesDecisionAction,
+        *,
+        selected_change_ids: list[str] | None = None,
+    ) -> ChangesDecisionResult:
+        """Apply or reject a batch of proposed file changes."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = ChangesDecisionParams(
+            batch_id=batch_id,
+            action=action,
+            selected_change_ids=selected_change_ids,
+        )
+        result = await self._client.decide_changes(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return ChangesDecisionResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

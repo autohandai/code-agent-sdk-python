@@ -154,3 +154,44 @@ async def test_directory_access_acknowledgement_rejects_malformed_result(
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.acknowledge_directory_access("directory-1"))
+
+
+@pytest.mark.asyncio
+async def test_multi_file_change_decision_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK sends a typed selected-change decision and validates counts."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.changesDecision",
+        params={
+            "batchId": "batch-1",
+            "action": "accept_selected",
+            "selectedChangeIds": ["change-1"],
+        },
+        result={
+            "success": True,
+            "appliedCount": 1,
+            "skippedCount": 1,
+            "errors": [{"changeId": "change-2", "error": "conflict"}],
+        },
+    )
+    result = await _with_sdk(
+        cli,
+        lambda sdk: sdk.decide_changes(
+            "batch-1", "accept_selected", selected_change_ids=["change-1"]
+        ),
+    )
+    assert result.applied_count == 1
+    assert result.errors[0].change_id == "change-2"
+
+
+@pytest.mark.asyncio
+async def test_multi_file_change_decision_rejects_malformed_count(tmp_path: Path) -> None:
+    """String decision counts do not cross the SDK trust boundary."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.changesDecision",
+        params={"batchId": "batch-1", "action": "accept_all"},
+        result={"success": True, "appliedCount": "one", "skippedCount": 0},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.decide_changes("batch-1", "accept_all"))

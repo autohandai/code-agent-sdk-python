@@ -1401,6 +1401,33 @@ class DirectoryAccessAcknowledgedResult(StrictRPCContractModel):
     success: bool
 
 
+ChangesDecisionAction: TypeAlias = Literal["accept_all", "reject_all", "accept_selected"]
+
+
+class ChangesDecisionParams(StrictRPCContractModel):
+    """Decision for a CLI-proposed batch of file changes."""
+
+    batch_id: str = Field(..., min_length=1)
+    action: ChangesDecisionAction
+    selected_change_ids: list[str] | None = None
+
+
+class ChangesDecisionError(StrictRPCContractModel):
+    """Failure applying one proposed file change."""
+
+    change_id: str
+    error: str
+
+
+class ChangesDecisionResult(StrictRPCContractModel):
+    """Outcome of applying a multi-file change decision."""
+
+    success: bool
+    applied_count: int
+    skipped_count: int
+    errors: list[ChangesDecisionError] = Field(default_factory=list)
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 
