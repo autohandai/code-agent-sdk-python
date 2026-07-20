@@ -27,6 +27,7 @@ RPC_METHODS = {
     "browser_handoff_create": "autohand.browserHandoff.create",
     "browser_handoff_attach": "autohand.browserHandoff.attach",
     "browser_handoff_attach_latest": "autohand.browserHandoff.attachLatest",
+    "automode_start": "autohand.automode.start",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -388,6 +389,33 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["browser_handoff_attach_latest"], {}),
+        )
+
+    async def start_automode(  # noqa: PLR0913 - mirrors the CLI RPC contract
+        self,
+        prompt: str,
+        *,
+        max_iterations: int | None = None,
+        completion_promise: str | None = None,
+        use_worktree: bool | None = None,
+        checkpoint_interval: int | None = None,
+        max_runtime: int | float | None = None,
+        max_cost: int | float | None = None,
+    ) -> dict[str, Any]:
+        """Start an autonomous execution session."""
+        params: dict[str, Any] = {"prompt": prompt}
+        optional = {
+            "maxIterations": max_iterations,
+            "completionPromise": completion_promise,
+            "useWorktree": use_worktree,
+            "checkpointInterval": checkpoint_interval,
+            "maxRuntime": max_runtime,
+            "maxCost": max_cost,
+        }
+        params.update({key: value for key, value in optional.items() if value is not None})
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["automode_start"], params),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:

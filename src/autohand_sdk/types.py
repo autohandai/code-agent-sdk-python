@@ -1403,6 +1403,26 @@ class BrowserHandoffAttachLatestParams(RPCContractModel):
 BrowserHandoffAttachLatestResult: TypeAlias = BrowserHandoffAttachResult
 
 
+class AutomodeStartParams(RPCContractModel):
+    """Parameters for starting autonomous execution."""
+
+    prompt: str
+    max_iterations: int | None = None
+    completion_promise: str | None = None
+    use_worktree: bool | None = None
+    checkpoint_interval: int | None = None
+    max_runtime: int | float | None = None
+    max_cost: int | float | None = None
+
+
+class AutomodeStartResult(RPCContractModel):
+    """Result from starting autonomous execution."""
+
+    success: bool
+    session_id: str | None = None
+    error: str | None = None
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

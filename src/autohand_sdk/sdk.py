@@ -13,6 +13,8 @@ from autohand_sdk.rpc_client import RPCClient
 from autohand_sdk.types import (
     AbortParams,
     AbortResult,
+    AutomodeStartParams,
+    AutomodeStartResult,
     AutoresearchCompareParams,
     AutoresearchCompareResult,
     AutoresearchConstraint,
@@ -309,6 +311,41 @@ class AutohandSDK:
 
         result = await self._client.attach_latest_browser_handoff()
         return BrowserHandoffAttachResult.model_validate(result)
+
+    async def start_automode(  # noqa: PLR0913 - mirrors the CLI RPC contract
+        self,
+        prompt: str,
+        *,
+        max_iterations: int | None = None,
+        completion_promise: str | None = None,
+        use_worktree: bool | None = None,
+        checkpoint_interval: int | None = None,
+        max_runtime: int | float | None = None,
+        max_cost: int | float | None = None,
+    ) -> AutomodeStartResult:
+        """Start an autonomous execution session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = AutomodeStartParams(
+            prompt=prompt,
+            max_iterations=max_iterations,
+            completion_promise=completion_promise,
+            use_worktree=use_worktree,
+            checkpoint_interval=checkpoint_interval,
+            max_runtime=max_runtime,
+            max_cost=max_cost,
+        )
+        result = await self._client.start_automode(
+            params.prompt,
+            max_iterations=params.max_iterations,
+            completion_promise=params.completion_promise,
+            use_worktree=params.use_worktree,
+            checkpoint_interval=params.checkpoint_interval,
+            max_runtime=params.max_runtime,
+            max_cost=params.max_cost,
+        )
+        return AutomodeStartResult.model_validate(result)
 
     async def respond_to_permission(
         self,

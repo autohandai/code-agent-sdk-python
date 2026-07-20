@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    AutomodeStartResult,
     BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
@@ -69,6 +70,28 @@ class Agent:
     async def attach_latest_browser_handoff(self) -> BrowserHandoffAttachLatestResult:
         """Attach the newest pending browser handoff."""
         return await self._sdk.attach_latest_browser_handoff()
+
+    async def start_automode(  # noqa: PLR0913 - mirrors the CLI RPC contract
+        self,
+        prompt: str,
+        *,
+        max_iterations: int | None = None,
+        completion_promise: str | None = None,
+        use_worktree: bool | None = None,
+        checkpoint_interval: int | None = None,
+        max_runtime: int | float | None = None,
+        max_cost: int | float | None = None,
+    ) -> AutomodeStartResult:
+        """Start an autonomous execution session."""
+        return await self._sdk.start_automode(
+            prompt,
+            max_iterations=max_iterations,
+            completion_promise=completion_promise,
+            use_worktree=use_worktree,
+            checkpoint_interval=checkpoint_interval,
+            max_runtime=max_runtime,
+            max_cost=max_cost,
+        )
 
     async def command(
         self,

@@ -70,6 +70,8 @@ __all__ = [
     "BrowserHandoffAttachResult",
     "BrowserHandoffAttachLatestParams",
     "BrowserHandoffAttachLatestResult",
+    "AutomodeStartParams",
+    "AutomodeStartResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

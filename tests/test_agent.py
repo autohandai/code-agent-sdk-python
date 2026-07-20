@@ -70,6 +70,30 @@ async def test_attach_latest_browser_handoff_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_automode_delegates_to_sdk() -> None:
+    """Agent exposes autonomous execution start."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.start_automode = AsyncMock(return_value="started")
+
+    result = await Agent.from_sdk(sdk).start_automode(
+        "Ship",
+        max_iterations=10,
+        use_worktree=False,
+    )
+
+    assert result == "started"
+    sdk.start_automode.assert_awaited_once_with(
+        "Ship",
+        max_iterations=10,
+        completion_promise=None,
+        use_worktree=False,
+        checkpoint_interval=None,
+        max_runtime=None,
+        max_cost=None,
+    )
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

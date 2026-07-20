@@ -174,6 +174,21 @@ already-consumed token is represented by `success=False`.
 `autohand.browserHandoff.attachLatest` with no parameters and returns the same
 typed result. It consumes the newest non-expired pending handoff.
 
+## Auto-mode
+
+```python
+started = await sdk.start_automode(
+    "Implement the approved plan",
+    max_iterations=20,
+    use_worktree=True,
+    checkpoint_interval=5,
+)
+```
+
+`start_automode()` maps its snake_case options to the exact
+`autohand.automode.start` lower-camel-case payload and returns
+`AutomodeStartResult`. Optional fields are omitted only when they are `None`.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

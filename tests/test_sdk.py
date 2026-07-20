@@ -8,6 +8,7 @@ import pytest
 
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
+    AutomodeStartResult,
     AutoresearchStartResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
@@ -364,6 +365,40 @@ class TestSDKMethods:
         request.assert_awaited_once_with("autohand.browserHandoff.attachLatest", {})
         assert result == BrowserHandoffAttachResult(success=False)
         assert result.session_id is None
+
+    @pytest.mark.asyncio
+    async def test_start_automode_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {"success": True, "sessionId": "auto-1"}
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.start_automode(
+                "Ship the release",
+                max_iterations=20,
+                completion_promise="DONE",
+                use_worktree=False,
+                checkpoint_interval=5,
+                max_runtime=60,
+                max_cost=2.5,
+            )
+
+        request.assert_awaited_once_with(
+            "autohand.automode.start",
+            {
+                "prompt": "Ship the release",
+                "maxIterations": 20,
+                "completionPromise": "DONE",
+                "useWorktree": False,
+                "checkpointInterval": 5,
+                "maxRuntime": 60,
+                "maxCost": 2.5,
+            },
+        )
+        assert result == AutomodeStartResult(success=True, session_id="auto-1")
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:
