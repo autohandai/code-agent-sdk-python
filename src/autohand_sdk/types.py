@@ -1252,6 +1252,22 @@ class McpInvokeRequestEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class McpToolSummary(StrictSDKEventModel):
+    """One MCP tool included in a registry-change notification."""
+
+    name: str
+    description: str
+    server_name: str
+
+
+class McpToolsChangedEvent(StrictSDKEventModel):
+    """Notification emitted after the MCP tool registry changes."""
+
+    type: Literal["mcp_tools_changed"] = "mcp_tools_changed"
+    tools: list[McpToolSummary]
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1391,6 +1407,7 @@ TypedSDKEvent: TypeAlias = (
     | HookPrePromptEvent
     | HookPostResponseEvent
     | McpInvokeRequestEvent
+    | McpToolsChangedEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1414,6 +1431,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "hook_pre_prompt": HookPrePromptEvent,
     "hook_post_response": HookPostResponseEvent,
     "mcp_invoke_request": McpInvokeRequestEvent,
+    "mcp_tools_changed": McpToolsChangedEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

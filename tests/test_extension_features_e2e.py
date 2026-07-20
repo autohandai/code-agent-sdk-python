@@ -21,6 +21,7 @@ from autohand_sdk import (
     HookPrePromptEvent,
     HookPreToolEvent,
     McpInvokeRequestEvent,
+    McpToolsChangedEvent,
     SDKConfig,
 )
 
@@ -972,3 +973,37 @@ async def test_mcp_invocation_request_event_preserves_malformed_fallback(
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["args"] == []
+
+
+@pytest.mark.asyncio
+async def test_mcp_tools_changed_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types MCP registry changes."""
+    notification = {
+        "method": "autohand.mcp.toolsChanged",
+        "params": {
+            "tools": [{"name": "find", "description": "Find symbols", "serverName": "vscode"}],
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, McpToolsChangedEvent)
+    assert event.tools[0].server_name == "vscode"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tools_changed_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed MCP registry changes remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.mcp.toolsChanged",
+        "params": {
+            "tools": [{"name": "find", "description": "Find", "serverName": 7}],
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["tools"][0]["serverName"] == 7

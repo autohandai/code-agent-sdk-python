@@ -62,6 +62,8 @@ __all__ = [
     "HookPrePromptEvent",
     "HookPostResponseEvent",
     "McpInvokeRequestEvent",
+    "McpToolSummary",
+    "McpToolsChangedEvent",
     "parse_sdk_event",
     "PromptParams",
     "PromptResult",

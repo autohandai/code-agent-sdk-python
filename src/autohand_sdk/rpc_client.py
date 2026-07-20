@@ -91,6 +91,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.hook.prePrompt": "hook_pre_prompt",
     "autohand.hook.postResponse": "hook_post_response",
     "autohand.mcp.invokeRequest": "mcp_invoke_request",
+    "autohand.mcp.toolsChanged": "mcp_tools_changed",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
