@@ -170,6 +170,10 @@ if attached.success:
 required token and returns `BrowserHandoffAttachResult`. A missing, expired, or
 already-consumed token is represented by `success=False`.
 
+`attach_latest_browser_handoff()` calls
+`autohand.browserHandoff.attachLatest` with no parameters and returns the same
+typed result. It consumes the newest non-expired pending handoff.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

@@ -350,6 +350,22 @@ class TestSDKMethods:
         assert result.message_count == 12
 
     @pytest.mark.asyncio
+    async def test_attach_latest_browser_handoff_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {"success": False}
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.attach_latest_browser_handoff()
+
+        request.assert_awaited_once_with("autohand.browserHandoff.attachLatest", {})
+        assert result == BrowserHandoffAttachResult(success=False)
+        assert result.session_id is None
+
+    @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:
         sdk = AutohandSDK()
         sdk._client = None

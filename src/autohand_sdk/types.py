@@ -1396,6 +1396,13 @@ class BrowserHandoffAttachResult(RPCContractModel):
     message_count: int | None = None
 
 
+class BrowserHandoffAttachLatestParams(RPCContractModel):
+    """Parameters for attaching the latest browser handoff."""
+
+
+BrowserHandoffAttachLatestResult: TypeAlias = BrowserHandoffAttachResult
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

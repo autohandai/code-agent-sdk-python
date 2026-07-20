@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
     GetSkillsRegistryResult,
@@ -64,6 +65,10 @@ class Agent:
     async def attach_browser_handoff(self, token: str) -> BrowserHandoffAttachResult:
         """Consume a browser handoff token and attach its session."""
         return await self._sdk.attach_browser_handoff(token)
+
+    async def attach_latest_browser_handoff(self) -> BrowserHandoffAttachLatestResult:
+        """Attach the newest pending browser handoff."""
+        return await self._sdk.attach_latest_browser_handoff()
 
     async def command(
         self,

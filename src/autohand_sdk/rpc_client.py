@@ -26,6 +26,7 @@ RPC_METHODS = {
     "reset": "autohand.reset",
     "browser_handoff_create": "autohand.browserHandoff.create",
     "browser_handoff_attach": "autohand.browserHandoff.attach",
+    "browser_handoff_attach_latest": "autohand.browserHandoff.attachLatest",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -380,6 +381,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["browser_handoff_attach"], {"token": token}),
+        )
+
+    async def attach_latest_browser_handoff(self) -> dict[str, Any]:
+        """Attach the newest pending browser handoff."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["browser_handoff_attach_latest"], {}),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:

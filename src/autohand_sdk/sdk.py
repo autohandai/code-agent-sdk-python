@@ -34,6 +34,7 @@ from autohand_sdk.types import (
     AutoresearchStatusResult,
     AutoresearchStopResult,
     AutoresearchSubagentOptions,
+    BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachParams,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateParams,
@@ -299,6 +300,14 @@ class AutohandSDK:
 
         params = BrowserHandoffAttachParams(token=token)
         result = await self._client.attach_browser_handoff(params.token)
+        return BrowserHandoffAttachResult.model_validate(result)
+
+    async def attach_latest_browser_handoff(self) -> BrowserHandoffAttachLatestResult:
+        """Attach the newest pending browser handoff."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        result = await self._client.attach_latest_browser_handoff()
         return BrowserHandoffAttachResult.model_validate(result)
 
     async def respond_to_permission(

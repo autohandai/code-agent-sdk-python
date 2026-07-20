@@ -60,6 +60,16 @@ async def test_attach_browser_handoff_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_attach_latest_browser_handoff_delegates_to_sdk() -> None:
+    """Agent exposes latest browser handoff attachment."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.attach_latest_browser_handoff = AsyncMock(return_value="latest")
+
+    assert await Agent.from_sdk(sdk).attach_latest_browser_handoff() == "latest"
+    sdk.attach_latest_browser_handoff.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)
