@@ -1522,6 +1522,20 @@ class SessionAttachResult(StrictRPCContractModel):
     error: str | None = None
 
 
+class YoloSetParams(StrictRPCContractModel):
+    """Timed unrestricted-mode settings."""
+
+    pattern: str
+    timeout_seconds: int | None = Field(None, ge=0)
+
+
+class YoloSetResult(StrictRPCContractModel):
+    """Result from changing timed unrestricted mode."""
+
+    success: bool
+    expires_in: int | None = None
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

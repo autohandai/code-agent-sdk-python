@@ -344,3 +344,42 @@ async def test_session_attachment_rejects_malformed_error(tmp_path: Path) -> Non
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.attach_session("session-1"))
+
+
+@pytest.mark.asyncio
+async def test_timed_yolo_uses_canonical_spawned_cli_method(tmp_path: Path) -> None:
+    """The SDK sends timed YOLO settings through the canonical method."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.yoloSet",
+        params={"pattern": "*", "timeoutSeconds": 300},
+        result={"success": True, "expiresIn": 300},
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.set_yolo("*", timeout_seconds=300))
+    assert result.expires_in == 300
+
+
+@pytest.mark.asyncio
+async def test_timed_yolo_supports_compatibility_alias(tmp_path: Path) -> None:
+    """Older dotted YOLO RPCs remain explicitly available."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.yolo.set",
+        params={"pattern": "bash:*", "timeoutSeconds": 60},
+        result={"success": True, "expiresIn": 60},
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.set_yolo_compat("bash:*", timeout_seconds=60))
+    assert result.expires_in == 60
+
+
+@pytest.mark.asyncio
+async def test_timed_yolo_rejects_malformed_expiration(tmp_path: Path) -> None:
+    """Non-numeric expiration values fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.yoloSet",
+        params={"pattern": ""},
+        result={"success": True, "expiresIn": "never"},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.set_yolo(""))

@@ -35,6 +35,7 @@ from autohand_sdk.types import (
     SDKConfig,
     SessionAttachResult,
     UpdateGoalParams,
+    YoloSetResult,
 )
 
 
@@ -114,6 +115,16 @@ class Agent:
     async def attach_session(self, session_id: str) -> SessionAttachResult:
         """Attach this agent to a saved session."""
         return await self._sdk.attach_session(session_id)
+
+    async def set_yolo(self, pattern: str, *, timeout_seconds: int | None = None) -> YoloSetResult:
+        """Set timed unrestricted mode through the canonical RPC."""
+        return await self._sdk.set_yolo(pattern, timeout_seconds=timeout_seconds)
+
+    async def set_yolo_compat(
+        self, pattern: str, *, timeout_seconds: int | None = None
+    ) -> YoloSetResult:
+        """Set timed unrestricted mode through the legacy dotted RPC."""
+        return await self._sdk.set_yolo_compat(pattern, timeout_seconds=timeout_seconds)
 
     async def create_browser_handoff(
         self,

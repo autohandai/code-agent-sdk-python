@@ -91,6 +91,8 @@ from autohand_sdk.types import (
     SessionAttachResult,
     SkillReference,
     UpdateGoalParams,
+    YoloSetParams,
+    YoloSetResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -525,6 +527,26 @@ class AutohandSDK:
         params = SessionAttachParams(session_id=session_id)
         result = await self._client.attach_session(params.session_id)
         return SessionAttachResult.model_validate(result)
+
+    async def set_yolo(self, pattern: str, *, timeout_seconds: int | None = None) -> YoloSetResult:
+        """Set timed unrestricted mode through the canonical RPC."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = YoloSetParams(pattern=pattern, timeout_seconds=timeout_seconds)
+        result = await self._client.set_yolo(params.model_dump(by_alias=True, exclude_none=True))
+        return YoloSetResult.model_validate(result)
+
+    async def set_yolo_compat(
+        self, pattern: str, *, timeout_seconds: int | None = None
+    ) -> YoloSetResult:
+        """Set timed unrestricted mode through the legacy dotted RPC."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = YoloSetParams(pattern=pattern, timeout_seconds=timeout_seconds)
+        result = await self._client.set_yolo_compat(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return YoloSetResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

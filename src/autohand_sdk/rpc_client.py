@@ -41,6 +41,8 @@ RPC_METHODS = {
     "get_history": "autohand.getHistory",
     "get_session": "autohand.getSession",
     "session_attach": "autohand.session.attach",
+    "yolo_set": "autohand.yoloSet",
+    "yolo_set_compat": "autohand.yolo.set",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -533,6 +535,17 @@ class RPCClient:
                 RPC_METHODS["session_attach"],
                 {"sessionId": session_id},
             ),
+        )
+
+    async def set_yolo(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Set timed unrestricted mode through the canonical RPC."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["yolo_set"], params))
+
+    async def set_yolo_compat(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Set timed unrestricted mode through the legacy dotted RPC."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["yolo_set_compat"], params),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

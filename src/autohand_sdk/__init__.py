@@ -83,6 +83,8 @@ __all__ = [
     "GetSessionResult",
     "SessionAttachParams",
     "SessionAttachResult",
+    "YoloSetParams",
+    "YoloSetResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",
