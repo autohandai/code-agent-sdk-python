@@ -16,6 +16,7 @@ from autohand_sdk import (
     AutomodeCompleteEvent,
     AutomodeErrorEvent,
     AutomodeIterationEvent,
+    HookPostResponseEvent,
     HookPostToolEvent,
     HookPrePromptEvent,
     HookPreToolEvent,
@@ -890,3 +891,43 @@ async def test_pre_prompt_hook_event_preserves_malformed_fallback(tmp_path: Path
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["mentioned_files"] == [42]
+
+
+@pytest.mark.asyncio
+async def test_post_response_hook_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types post-response hook notifications."""
+    notification = {
+        "method": "autohand.hook.postResponse",
+        "params": {
+            "tokensUsed": 900,
+            "tokensUsageStatus": "actual",
+            "toolCallsCount": 2,
+            "duration": 1250,
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, HookPostResponseEvent)
+    assert event.tool_calls_count == 2
+
+
+@pytest.mark.asyncio
+async def test_post_response_hook_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed post-response hooks remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.hook.postResponse",
+        "params": {
+            "tokensUsed": 900,
+            "tokensUsageStatus": "estimated",
+            "toolCallsCount": 2,
+            "duration": 1250,
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["tokens_usage_status"] == "estimated"

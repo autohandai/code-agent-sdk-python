@@ -1231,6 +1231,17 @@ class HookPrePromptEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class HookPostResponseEvent(StrictSDKEventModel):
+    """Hook notification emitted after response processing."""
+
+    type: Literal["hook_post_response"] = "hook_post_response"
+    tokens_used: int | float
+    tokens_usage_status: Literal["actual", "unavailable"] | None = None
+    tool_calls_count: int
+    duration: int | float
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1368,6 +1379,7 @@ TypedSDKEvent: TypeAlias = (
     | HookPreToolEvent
     | HookPostToolEvent
     | HookPrePromptEvent
+    | HookPostResponseEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1389,6 +1401,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "hook_pre_tool": HookPreToolEvent,
     "hook_post_tool": HookPostToolEvent,
     "hook_pre_prompt": HookPrePromptEvent,
+    "hook_post_response": HookPostResponseEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

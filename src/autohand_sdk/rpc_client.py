@@ -89,6 +89,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.hook.preTool": "hook_pre_tool",
     "autohand.hook.postTool": "hook_post_tool",
     "autohand.hook.prePrompt": "hook_pre_prompt",
+    "autohand.hook.postResponse": "hook_post_response",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
@@ -143,6 +144,7 @@ CAMEL_TO_SNAKE_KEYS = {
     "filesCreated": "files_created",
     "filesModified": "files_modified",
     "mentionedFiles": "mentioned_files",
+    "toolCallsCount": "tool_calls_count",
 }
 
 EVENT_BACKLOG_LIMIT = 1_024

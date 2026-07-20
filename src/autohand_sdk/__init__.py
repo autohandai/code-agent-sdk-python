@@ -60,6 +60,7 @@ __all__ = [
     "HookPreToolEvent",
     "HookPostToolEvent",
     "HookPrePromptEvent",
+    "HookPostResponseEvent",
     "parse_sdk_event",
     "PromptParams",
     "PromptResult",
