@@ -9,6 +9,7 @@ import pytest
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
     AutomodeStartResult,
+    AutomodeStatusResult,
     AutoresearchStartResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
@@ -399,6 +400,42 @@ class TestSDKMethods:
             },
         )
         assert result == AutomodeStartResult(success=True, session_id="auto-1")
+
+    @pytest.mark.asyncio
+    async def test_get_automode_status_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {
+            "active": True,
+            "paused": False,
+            "state": {
+                "sessionId": "auto-1",
+                "status": "running",
+                "currentIteration": 3,
+                "maxIterations": 20,
+                "filesCreated": 2,
+                "filesModified": 4,
+                "branch": "autohand/auto-1",
+                "lastCheckpoint": {
+                    "commit": "abc123",
+                    "message": "iteration 2",
+                    "timestamp": "2026-07-20T00:02:00.000Z",
+                },
+            },
+        }
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.get_automode_status()
+
+        request.assert_awaited_once_with("autohand.automode.status", {})
+        assert result == AutomodeStatusResult.model_validate(wire_result)
+        assert result.state is not None
+        assert result.state.current_iteration == 3
+        assert result.state.last_checkpoint is not None
+        assert result.state.last_checkpoint.commit == "abc123"
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:

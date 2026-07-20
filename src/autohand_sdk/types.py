@@ -1423,6 +1423,48 @@ class AutomodeStartResult(RPCContractModel):
     error: str | None = None
 
 
+AutomodeSessionStatus: TypeAlias = Literal[
+    "running",
+    "paused",
+    "completed",
+    "cancelled",
+    "failed",
+]
+
+
+class AutomodeCheckpoint(RPCContractModel):
+    """Latest source-control checkpoint for an auto-mode session."""
+
+    commit: str
+    message: str
+    timestamp: str
+
+
+class AutomodeState(RPCContractModel):
+    """Detailed state for an active or completed auto-mode session."""
+
+    session_id: str
+    status: AutomodeSessionStatus
+    current_iteration: int
+    max_iterations: int
+    files_created: int
+    files_modified: int
+    branch: str | None = None
+    last_checkpoint: AutomodeCheckpoint | None = None
+
+
+class AutomodeStatusParams(RPCContractModel):
+    """Parameters for reading auto-mode status."""
+
+
+class AutomodeStatusResult(RPCContractModel):
+    """Current autonomous execution status."""
+
+    active: bool
+    paused: bool
+    state: AutomodeState | None = None
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

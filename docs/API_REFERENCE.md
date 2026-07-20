@@ -189,6 +189,10 @@ started = await sdk.start_automode(
 `autohand.automode.start` lower-camel-case payload and returns
 `AutomodeStartResult`. Optional fields are omitted only when they are `None`.
 
+`get_automode_status()` calls `autohand.automode.status` and returns an
+`AutomodeStatusResult`. When present, `state` includes iteration and file
+counts, branch, and a typed latest checkpoint.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

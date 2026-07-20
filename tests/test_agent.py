@@ -94,6 +94,16 @@ async def test_start_automode_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_automode_status_delegates_to_sdk() -> None:
+    """Agent exposes autonomous execution status."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.get_automode_status = AsyncMock(return_value="status")
+
+    assert await Agent.from_sdk(sdk).get_automode_status() == "status"
+    sdk.get_automode_status.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

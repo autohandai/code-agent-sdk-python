@@ -7,6 +7,7 @@ from typing import Any, Literal
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
     AutomodeStartResult,
+    AutomodeStatusResult,
     BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
@@ -92,6 +93,10 @@ class Agent:
             max_runtime=max_runtime,
             max_cost=max_cost,
         )
+
+    async def get_automode_status(self) -> AutomodeStatusResult:
+        """Get the current autonomous execution status."""
+        return await self._sdk.get_automode_status()
 
     async def command(
         self,

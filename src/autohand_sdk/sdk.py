@@ -15,6 +15,7 @@ from autohand_sdk.types import (
     AbortResult,
     AutomodeStartParams,
     AutomodeStartResult,
+    AutomodeStatusResult,
     AutoresearchCompareParams,
     AutoresearchCompareResult,
     AutoresearchConstraint,
@@ -346,6 +347,14 @@ class AutohandSDK:
             max_cost=params.max_cost,
         )
         return AutomodeStartResult.model_validate(result)
+
+    async def get_automode_status(self) -> AutomodeStatusResult:
+        """Get the current autonomous execution status."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        result = await self._client.get_automode_status()
+        return AutomodeStatusResult.model_validate(result)
 
     async def respond_to_permission(
         self,

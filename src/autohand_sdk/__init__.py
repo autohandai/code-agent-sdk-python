@@ -72,6 +72,11 @@ __all__ = [
     "BrowserHandoffAttachLatestResult",
     "AutomodeStartParams",
     "AutomodeStartResult",
+    "AutomodeSessionStatus",
+    "AutomodeCheckpoint",
+    "AutomodeState",
+    "AutomodeStatusParams",
+    "AutomodeStatusResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

@@ -28,6 +28,7 @@ RPC_METHODS = {
     "browser_handoff_attach": "autohand.browserHandoff.attach",
     "browser_handoff_attach_latest": "autohand.browserHandoff.attachLatest",
     "automode_start": "autohand.automode.start",
+    "automode_status": "autohand.automode.status",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -416,6 +417,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["automode_start"], params),
+        )
+
+    async def get_automode_status(self) -> dict[str, Any]:
+        """Get the current autonomous execution status."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["automode_status"], {}),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:
