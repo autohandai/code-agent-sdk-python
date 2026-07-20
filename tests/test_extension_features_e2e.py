@@ -17,6 +17,7 @@ from autohand_sdk import (
     AutomodeErrorEvent,
     AutomodeIterationEvent,
     HookPostToolEvent,
+    HookPrePromptEvent,
     HookPreToolEvent,
     SDKConfig,
 )
@@ -857,3 +858,35 @@ async def test_post_tool_hook_event_preserves_malformed_fallback(tmp_path: Path)
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["duration"] == "fast"
+
+
+@pytest.mark.asyncio
+async def test_pre_prompt_hook_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types pre-prompt hook notifications."""
+    notification = {
+        "method": "autohand.hook.prePrompt",
+        "params": {
+            "instruction": "Review this change",
+            "mentionedFiles": ["src/sdk.py"],
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, HookPrePromptEvent)
+    assert event.mentioned_files == ["src/sdk.py"]
+
+
+@pytest.mark.asyncio
+async def test_pre_prompt_hook_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed pre-prompt hooks remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.hook.prePrompt",
+        "params": {"instruction": "Review", "mentionedFiles": [42], "timestamp": "t1"},
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["mentioned_files"] == [42]

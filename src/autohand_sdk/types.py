@@ -1222,6 +1222,15 @@ class HookPostToolEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class HookPrePromptEvent(StrictSDKEventModel):
+    """Hook notification emitted before prompt processing."""
+
+    type: Literal["hook_pre_prompt"] = "hook_pre_prompt"
+    instruction: str
+    mentioned_files: list[str]
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1358,6 +1367,7 @@ TypedSDKEvent: TypeAlias = (
     | AutomodeErrorEvent
     | HookPreToolEvent
     | HookPostToolEvent
+    | HookPrePromptEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1378,6 +1388,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "automode_error": AutomodeErrorEvent,
     "hook_pre_tool": HookPreToolEvent,
     "hook_post_tool": HookPostToolEvent,
+    "hook_pre_prompt": HookPrePromptEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

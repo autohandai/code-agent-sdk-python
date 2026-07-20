@@ -88,6 +88,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.automode.error": "automode_error",
     "autohand.hook.preTool": "hook_pre_tool",
     "autohand.hook.postTool": "hook_post_tool",
+    "autohand.hook.prePrompt": "hook_pre_prompt",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
@@ -141,6 +142,7 @@ CAMEL_TO_SNAKE_KEYS = {
     "driftWarnings": "drift_warnings",
     "filesCreated": "files_created",
     "filesModified": "files_modified",
+    "mentionedFiles": "mentioned_files",
 }
 
 EVENT_BACKLOG_LIMIT = 1_024
