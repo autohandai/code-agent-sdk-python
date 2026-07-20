@@ -26,6 +26,7 @@ from autohand_sdk.types import (
     GoalSnapshotResult,
     GoalTemplatesResult,
     InstallSkillResult,
+    LearnGenerateResult,
     LearnRecommendResult,
     LearnUpdateResult,
     McpGetServerConfigsResult,
@@ -163,6 +164,10 @@ class Agent:
     async def update_learned_skills(self) -> LearnUpdateResult:
         """Update installed project skills from their registry sources."""
         return await self._sdk.update_learned_skills()
+
+    async def generate_skill(self, scope: Literal["project", "user"]) -> LearnGenerateResult:
+        """Generate a reusable skill from the current project context."""
+        return await self._sdk.generate_skill(scope)
 
     async def create_browser_handoff(
         self,

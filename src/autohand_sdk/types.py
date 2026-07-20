@@ -1630,6 +1630,21 @@ class LearnUpdateResult(StrictRPCContractModel):
     error: str | None = None
 
 
+class LearnGenerateParams(StrictRPCContractModel):
+    """Scope for generating a reusable skill."""
+
+    scope: Literal["project", "user"]
+
+
+class LearnGenerateResult(StrictRPCContractModel):
+    """Result of generating a reusable skill."""
+
+    success: bool
+    skill_name: str | None = None
+    skill_path: str | None = None
+    error: str | None = None
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

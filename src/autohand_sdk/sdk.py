@@ -76,6 +76,8 @@ from autohand_sdk.types import (
     GoalTemplateMetadata,
     GoalTemplatesResult,
     InstallSkillResult,
+    LearnGenerateParams,
+    LearnGenerateResult,
     LearnRecommendParams,
     LearnRecommendResult,
     LearnUpdateResult,
@@ -608,6 +610,14 @@ class AutohandSDK:
         if not self._client:
             raise RuntimeError("SDK not started")
         return LearnUpdateResult.model_validate(await self._client.update_learned_skills())
+
+    async def generate_skill(self, scope: Literal["project", "user"]) -> LearnGenerateResult:
+        """Generate a reusable skill from the current project context."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = LearnGenerateParams(scope=scope)
+        response = await self._client.generate_skill(params.model_dump(by_alias=True))
+        return LearnGenerateResult.model_validate(response)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

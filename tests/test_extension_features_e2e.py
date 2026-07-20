@@ -533,3 +533,33 @@ async def test_learning_updates_reject_unknown_status(tmp_path: Path) -> None:
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.update_learned_skills())
+
+
+@pytest.mark.asyncio
+async def test_skill_generation_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK generates a reusable skill from the current project."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.generate",
+        params={"scope": "project"},
+        result={
+            "success": True,
+            "skillName": "tin-wrapper",
+            "skillPath": "/workspace/.autohand/skills/tin-wrapper/SKILL.md",
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.generate_skill("project"))
+    assert result.skill_name == "tin-wrapper"
+
+
+@pytest.mark.asyncio
+async def test_skill_generation_rejects_malformed_path(tmp_path: Path) -> None:
+    """Non-string generated-skill paths fail validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.generate",
+        params={"scope": "user"},
+        result={"success": True, "skillName": "shared", "skillPath": 17},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.generate_skill("user"))

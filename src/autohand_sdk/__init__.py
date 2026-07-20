@@ -97,6 +97,8 @@ __all__ = [
     "LearnRecommendResult",
     "LearnUpdateEntry",
     "LearnUpdateResult",
+    "LearnGenerateParams",
+    "LearnGenerateResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",
