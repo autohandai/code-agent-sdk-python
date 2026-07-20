@@ -383,3 +383,41 @@ async def test_timed_yolo_rejects_malformed_expiration(tmp_path: Path) -> None:
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.set_yolo(""))
+
+
+@pytest.mark.asyncio
+async def test_vscode_mcp_tool_registration_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK sends validated VS Code MCP descriptors to the CLI."""
+    tools = [
+        {
+            "name": "vscode.findReferences",
+            "description": "Find references",
+            "serverName": "vscode",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"symbol": {"type": "string"}},
+                "required": ["symbol"],
+            },
+        }
+    ]
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.mcp.setVscodeTools",
+        params={"tools": tools},
+        result={"success": True},
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.set_vscode_mcp_tools(tools))
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_vscode_mcp_tool_registration_rejects_malformed_result(tmp_path: Path) -> None:
+    """Malformed registration acknowledgements fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.mcp.setVscodeTools",
+        params={"tools": []},
+        result={"success": None},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.set_vscode_mcp_tools([]))

@@ -43,6 +43,7 @@ RPC_METHODS = {
     "session_attach": "autohand.session.attach",
     "yolo_set": "autohand.yoloSet",
     "yolo_set_compat": "autohand.yolo.set",
+    "mcp_set_vscode_tools": "autohand.mcp.setVscodeTools",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -546,6 +547,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["yolo_set_compat"], params),
+        )
+
+    async def set_vscode_mcp_tools(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Replace the CLI's VS Code-hosted MCP tool descriptors."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["mcp_set_vscode_tools"], params),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

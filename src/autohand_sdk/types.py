@@ -1536,6 +1536,35 @@ class YoloSetResult(StrictRPCContractModel):
     expires_in: int | None = None
 
 
+class VscodeMcpInputSchema(StrictRPCContractModel):
+    """JSON object schema for one VS Code-hosted MCP tool."""
+
+    type: Literal["object"]
+    properties: dict[str, Any]
+    required: list[str] | None = None
+
+
+class VscodeMcpToolDescriptor(StrictRPCContractModel):
+    """Descriptor for a tool hosted by the VS Code extension."""
+
+    name: str
+    description: str
+    server_name: str
+    input_schema: VscodeMcpInputSchema | None = None
+
+
+class McpSetVscodeToolsParams(StrictRPCContractModel):
+    """Replacement VS Code MCP tool set."""
+
+    tools: list[VscodeMcpToolDescriptor]
+
+
+class McpSetVscodeToolsResult(StrictRPCContractModel):
+    """Acknowledgement after replacing VS Code MCP descriptors."""
+
+    success: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

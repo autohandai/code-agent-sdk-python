@@ -29,12 +29,14 @@ from autohand_sdk.types import (
     McpGetServerConfigsResult,
     McpListServersResult,
     McpListToolsResult,
+    McpSetVscodeToolsResult,
     PermissionAcknowledgedResult,
     PromptResult,
     ResetResult,
     SDKConfig,
     SessionAttachResult,
     UpdateGoalParams,
+    VscodeMcpToolDescriptor,
     YoloSetResult,
 )
 
@@ -125,6 +127,13 @@ class Agent:
     ) -> YoloSetResult:
         """Set timed unrestricted mode through the legacy dotted RPC."""
         return await self._sdk.set_yolo_compat(pattern, timeout_seconds=timeout_seconds)
+
+    async def set_vscode_mcp_tools(
+        self,
+        tools: list[VscodeMcpToolDescriptor | dict[str, Any]],
+    ) -> McpSetVscodeToolsResult:
+        """Replace the CLI's VS Code-hosted MCP tool descriptors."""
+        return await self._sdk.set_vscode_mcp_tools(tools)
 
     async def create_browser_handoff(
         self,

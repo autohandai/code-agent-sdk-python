@@ -79,6 +79,8 @@ from autohand_sdk.types import (
     McpGetServerConfigsResult,
     McpListServersResult,
     McpListToolsResult,
+    McpSetVscodeToolsParams,
+    McpSetVscodeToolsResult,
     PermissionAcknowledgedParams,
     PermissionAcknowledgedResult,
     PermissionResponseParams,
@@ -91,6 +93,7 @@ from autohand_sdk.types import (
     SessionAttachResult,
     SkillReference,
     UpdateGoalParams,
+    VscodeMcpToolDescriptor,
     YoloSetParams,
     YoloSetResult,
 )
@@ -547,6 +550,19 @@ class AutohandSDK:
             params.model_dump(by_alias=True, exclude_none=True)
         )
         return YoloSetResult.model_validate(result)
+
+    async def set_vscode_mcp_tools(
+        self,
+        tools: list[VscodeMcpToolDescriptor | dict[str, Any]],
+    ) -> McpSetVscodeToolsResult:
+        """Replace the CLI's VS Code-hosted MCP tool descriptors."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = McpSetVscodeToolsParams.model_validate({"tools": tools})
+        result = await self._client.set_vscode_mcp_tools(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return McpSetVscodeToolsResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.
