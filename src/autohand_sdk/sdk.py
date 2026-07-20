@@ -61,6 +61,10 @@ from autohand_sdk.types import (
     GetHistoryResult,
     GetMessagesParams,
     GetMessagesResult,
+    GetSessionFailureResult,
+    GetSessionParams,
+    GetSessionResult,
+    GetSessionSuccessResult,
     GetSkillsRegistryResult,
     GetStateParams,
     GetStateResult,
@@ -501,6 +505,16 @@ class AutohandSDK:
         params = GetHistoryParams(page=page, page_size=page_size)
         result = await self._client.get_history(params.model_dump(by_alias=True, exclude_none=True))
         return GetHistoryResult.model_validate(result)
+
+    async def get_session(self, session_id: str) -> GetSessionResult:
+        """Return one saved session with messages and workspace metadata."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = GetSessionParams(session_id=session_id)
+        result = await self._client.get_session(params.session_id)
+        if result.get("success") is True:
+            return GetSessionSuccessResult.model_validate(result)
+        return GetSessionFailureResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

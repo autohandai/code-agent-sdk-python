@@ -1456,6 +1456,56 @@ class GetHistoryResult(StrictRPCContractModel):
     total_items: int
 
 
+class GetSessionParams(StrictRPCContractModel):
+    """Parameters for loading one saved session."""
+
+    session_id: str = Field(..., min_length=1)
+
+
+class RPCMessageToolCall(StrictRPCContractModel):
+    """One tool call recorded in a saved session message."""
+
+    id: str
+    name: str
+    args: dict[str, Any]
+
+
+class RPCMessage(StrictRPCContractModel):
+    """One persisted CLI conversation message."""
+
+    id: str
+    role: Literal["user", "assistant", "system", "tool"]
+    content: str
+    timestamp: str
+    tool_calls: list[RPCMessageToolCall] = Field(default_factory=list)
+
+
+class GetSessionSuccessResult(StrictRPCContractModel):
+    """Complete saved-session payload."""
+
+    success: Literal[True]
+    session_id: str
+    project_name: str
+    model: str
+    message_count: int
+    status: str
+    created_at: str
+    last_active_at: str
+    summary: str | None = None
+    messages: list[RPCMessage]
+    workspace_root: str
+
+
+class GetSessionFailureResult(StrictRPCContractModel):
+    """Failure to load a saved session."""
+
+    success: Literal[False]
+    error: str | None = None
+
+
+GetSessionResult: TypeAlias = GetSessionSuccessResult | GetSessionFailureResult
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

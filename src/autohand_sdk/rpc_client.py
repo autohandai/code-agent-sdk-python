@@ -39,6 +39,7 @@ RPC_METHODS = {
     "directory_access_acknowledged": "autohand.directoryAccessAcknowledged",
     "changes_decision": "autohand.changesDecision",
     "get_history": "autohand.getHistory",
+    "get_session": "autohand.getSession",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -511,6 +512,16 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["get_history"], params),
+        )
+
+    async def get_session(self, session_id: str) -> dict[str, Any]:
+        """Return one saved session with messages and workspace metadata."""
+        return cast(
+            dict[str, Any],
+            await self._request(
+                RPC_METHODS["get_session"],
+                {"sessionId": session_id},
+            ),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -20,6 +20,7 @@ from autohand_sdk.types import (
     DirectoryAccessAcknowledgedResult,
     DirectoryAccessResponseResult,
     GetHistoryResult,
+    GetSessionResult,
     GetSkillsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
@@ -104,6 +105,10 @@ class Agent:
     ) -> GetHistoryResult:
         """Return paginated saved-session metadata."""
         return await self._sdk.get_history(page=page, page_size=page_size)
+
+    async def get_session(self, session_id: str) -> GetSessionResult:
+        """Return one saved session with messages and workspace metadata."""
+        return await self._sdk.get_session(session_id)
 
     async def create_browser_handoff(
         self,

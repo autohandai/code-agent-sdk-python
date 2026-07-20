@@ -252,3 +252,64 @@ async def test_session_history_rejects_unknown_status(tmp_path: Path) -> None:
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.get_history())
+
+
+@pytest.mark.asyncio
+async def test_session_details_use_spawned_cli(tmp_path: Path) -> None:
+    """The SDK returns typed session metadata and messages."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getSession",
+        params={"sessionId": "session-1"},
+        result={
+            "success": True,
+            "sessionId": "session-1",
+            "projectName": "tin-wrapper",
+            "model": "fantail",
+            "messageCount": 1,
+            "status": "completed",
+            "createdAt": "t1",
+            "lastActiveAt": "t2",
+            "summary": "Done",
+            "messages": [
+                {
+                    "id": "message-1",
+                    "role": "assistant",
+                    "content": "Done",
+                    "timestamp": "t2",
+                    "toolCalls": [{"id": "tool-1", "name": "write_file", "args": {"path": "a.py"}}],
+                }
+            ],
+            "workspaceRoot": "/workspace",
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.get_session("session-1"))
+    assert result.success is True
+    assert result.messages[0].tool_calls[0].name == "write_file"
+
+
+@pytest.mark.asyncio
+async def test_missing_session_result_is_typed(tmp_path: Path) -> None:
+    """A missing saved session remains a typed failure result."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getSession",
+        params={"sessionId": "missing"},
+        result={"success": False, "error": "Session not found"},
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.get_session("missing"))
+    assert result.success is False
+    assert result.error == "Session not found"
+
+
+@pytest.mark.asyncio
+async def test_successful_session_details_require_complete_payload(tmp_path: Path) -> None:
+    """Incomplete successful session payloads fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getSession",
+        params={"sessionId": "session-1"},
+        result={"success": True, "sessionId": "session-1"},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.get_session("session-1"))
