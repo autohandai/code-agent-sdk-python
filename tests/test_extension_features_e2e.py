@@ -16,6 +16,7 @@ from autohand_sdk import (
     AutomodeCompleteEvent,
     AutomodeErrorEvent,
     AutomodeIterationEvent,
+    HookPostToolEvent,
     HookPreToolEvent,
     SDKConfig,
 )
@@ -815,3 +816,44 @@ async def test_pre_tool_hook_event_preserves_malformed_fallback(tmp_path: Path) 
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["args"] == "a.py"
+
+
+@pytest.mark.asyncio
+async def test_post_tool_hook_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types post-tool hook notifications."""
+    notification = {
+        "method": "autohand.hook.postTool",
+        "params": {
+            "toolId": "tool-1",
+            "toolName": "write_file",
+            "success": True,
+            "duration": 42,
+            "output": "ok",
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, HookPostToolEvent)
+    assert event.duration == 42
+
+
+@pytest.mark.asyncio
+async def test_post_tool_hook_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed post-tool hooks remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.hook.postTool",
+        "params": {
+            "toolId": "tool-1",
+            "toolName": "write_file",
+            "success": True,
+            "duration": "fast",
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["duration"] == "fast"

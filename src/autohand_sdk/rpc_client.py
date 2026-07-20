@@ -87,6 +87,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.automode.complete": "automode_complete",
     "autohand.automode.error": "automode_error",
     "autohand.hook.preTool": "hook_pre_tool",
+    "autohand.hook.postTool": "hook_post_tool",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",

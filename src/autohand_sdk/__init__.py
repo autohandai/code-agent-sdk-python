@@ -58,6 +58,7 @@ __all__ = [
     "AutomodeCompleteEvent",
     "AutomodeErrorEvent",
     "HookPreToolEvent",
+    "HookPostToolEvent",
     "parse_sdk_event",
     "PromptParams",
     "PromptResult",
