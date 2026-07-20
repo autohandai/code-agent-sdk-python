@@ -1613,6 +1613,23 @@ class LearnRecommendResult(StrictRPCContractModel):
     error: str | None = None
 
 
+class LearnUpdateEntry(StrictRPCContractModel):
+    """Outcome for one installed project skill."""
+
+    name: str
+    status: Literal["updated", "unchanged", "failed"]
+
+
+class LearnUpdateResult(StrictRPCContractModel):
+    """Summary of updating installed project skills."""
+
+    success: bool
+    updated: int
+    unchanged: int
+    results: list[LearnUpdateEntry]
+    error: str | None = None
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

@@ -493,3 +493,43 @@ async def test_learning_recommendations_reject_malformed_score(tmp_path: Path) -
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.get_learning_recommendations())
+
+
+@pytest.mark.asyncio
+async def test_learning_updates_use_spawned_cli(tmp_path: Path) -> None:
+    """The SDK updates installed project skills through the CLI."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.update",
+        params={},
+        result={
+            "success": True,
+            "updated": 1,
+            "unchanged": 1,
+            "results": [
+                {"name": "python", "status": "updated"},
+                {"name": "tdd", "status": "unchanged"},
+            ],
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.update_learned_skills())
+    assert result.updated == 1
+    assert result.results[0].status == "updated"
+
+
+@pytest.mark.asyncio
+async def test_learning_updates_reject_unknown_status(tmp_path: Path) -> None:
+    """Unknown learned-skill update statuses fail validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.update",
+        params={},
+        result={
+            "success": False,
+            "updated": 0,
+            "unchanged": 0,
+            "results": [{"name": "python", "status": "skipped"}],
+        },
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.update_learned_skills())

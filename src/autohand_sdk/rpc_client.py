@@ -46,6 +46,7 @@ RPC_METHODS = {
     "mcp_set_vscode_tools": "autohand.mcp.setVscodeTools",
     "mcp_invoke_response": "autohand.mcp.invokeResponse",
     "learn_recommend": "autohand.learn.recommend",
+    "learn_update": "autohand.learn.update",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -570,6 +571,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["learn_recommend"], params),
+        )
+
+    async def update_learned_skills(self) -> dict[str, Any]:
+        """Update installed project skills from their registry sources."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["learn_update"], {}),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
