@@ -313,3 +313,34 @@ async def test_successful_session_details_require_complete_payload(tmp_path: Pat
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.get_session("session-1"))
+
+
+@pytest.mark.asyncio
+async def test_session_attachment_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK attaches to a saved session and returns typed metadata."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.session.attach",
+        params={"sessionId": "session-1"},
+        result={
+            "success": True,
+            "sessionId": "session-1",
+            "workspaceRoot": "/workspace",
+            "messageCount": 8,
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.attach_session("session-1"))
+    assert result.workspace_root == "/workspace"
+
+
+@pytest.mark.asyncio
+async def test_session_attachment_rejects_malformed_error(tmp_path: Path) -> None:
+    """Non-string attachment errors fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.session.attach",
+        params={"sessionId": "session-1"},
+        result={"success": False, "error": 404},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.attach_session("session-1"))

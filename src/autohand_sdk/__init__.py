@@ -81,6 +81,8 @@ __all__ = [
     "GetSessionSuccessResult",
     "GetSessionFailureResult",
     "GetSessionResult",
+    "SessionAttachParams",
+    "SessionAttachResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",

@@ -1506,6 +1506,22 @@ class GetSessionFailureResult(StrictRPCContractModel):
 GetSessionResult: TypeAlias = GetSessionSuccessResult | GetSessionFailureResult
 
 
+class SessionAttachParams(StrictRPCContractModel):
+    """Parameters for attaching this connection to a saved session."""
+
+    session_id: str = Field(..., min_length=1)
+
+
+class SessionAttachResult(StrictRPCContractModel):
+    """Result from attaching to a saved session."""
+
+    success: bool
+    session_id: str | None = None
+    workspace_root: str | None = None
+    message_count: int | None = None
+    error: str | None = None
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

@@ -40,6 +40,7 @@ RPC_METHODS = {
     "changes_decision": "autohand.changesDecision",
     "get_history": "autohand.getHistory",
     "get_session": "autohand.getSession",
+    "session_attach": "autohand.session.attach",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -520,6 +521,16 @@ class RPCClient:
             dict[str, Any],
             await self._request(
                 RPC_METHODS["get_session"],
+                {"sessionId": session_id},
+            ),
+        )
+
+    async def attach_session(self, session_id: str) -> dict[str, Any]:
+        """Attach this RPC connection to a saved session."""
+        return cast(
+            dict[str, Any],
+            await self._request(
+                RPC_METHODS["session_attach"],
                 {"sessionId": session_id},
             ),
         )

@@ -87,6 +87,8 @@ from autohand_sdk.types import (
     ResetResult,
     SDKConfig,
     SDKEvent,
+    SessionAttachParams,
+    SessionAttachResult,
     SkillReference,
     UpdateGoalParams,
 )
@@ -515,6 +517,14 @@ class AutohandSDK:
         if result.get("success") is True:
             return GetSessionSuccessResult.model_validate(result)
         return GetSessionFailureResult.model_validate(result)
+
+    async def attach_session(self, session_id: str) -> SessionAttachResult:
+        """Attach this SDK instance to a saved session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = SessionAttachParams(session_id=session_id)
+        result = await self._client.attach_session(params.session_id)
+        return SessionAttachResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

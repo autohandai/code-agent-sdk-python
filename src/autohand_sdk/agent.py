@@ -33,6 +33,7 @@ from autohand_sdk.types import (
     PromptResult,
     ResetResult,
     SDKConfig,
+    SessionAttachResult,
     UpdateGoalParams,
 )
 
@@ -109,6 +110,10 @@ class Agent:
     async def get_session(self, session_id: str) -> GetSessionResult:
         """Return one saved session with messages and workspace metadata."""
         return await self._sdk.get_session(session_id)
+
+    async def attach_session(self, session_id: str) -> SessionAttachResult:
+        """Attach this agent to a saved session."""
+        return await self._sdk.attach_session(session_id)
 
     async def create_browser_handoff(
         self,
