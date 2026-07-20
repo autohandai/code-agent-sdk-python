@@ -1180,6 +1180,17 @@ class AutomodeIterationEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class AutomodeCompleteEvent(StrictSDKEventModel):
+    """Summary emitted when auto-mode completes."""
+
+    type: Literal["automode_complete"] = "automode_complete"
+    session_id: str
+    iterations: int
+    files_created: int
+    files_modified: int
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1312,6 +1323,7 @@ class AutoresearchOperationEvent(AutoresearchModel):
 
 TypedSDKEvent: TypeAlias = (
     AutomodeIterationEvent
+    | AutomodeCompleteEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1328,6 +1340,7 @@ SDKEvent: TypeAlias = dict[str, Any]
 
 EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "automode_iteration": AutomodeIterationEvent,
+    "automode_complete": AutomodeCompleteEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

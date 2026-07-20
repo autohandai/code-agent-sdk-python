@@ -11,7 +11,12 @@ from typing import Any, TypeVar
 import pytest
 from pydantic import ValidationError
 
-from autohand_sdk import AutohandSDK, AutomodeIterationEvent, SDKConfig
+from autohand_sdk import (
+    AutohandSDK,
+    AutomodeCompleteEvent,
+    AutomodeIterationEvent,
+    SDKConfig,
+)
 
 T = TypeVar("T")
 
@@ -702,3 +707,43 @@ async def test_automode_iteration_event_preserves_malformed_fallback(tmp_path: P
     assert isinstance(event, dict)
     assert event["type"] == "automode_iteration"
     assert event["iteration"] == "three"
+
+
+@pytest.mark.asyncio
+async def test_automode_completion_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types auto-mode completion notifications."""
+    notification = {
+        "method": "autohand.automode.complete",
+        "params": {
+            "sessionId": "automode-1",
+            "iterations": 8,
+            "filesCreated": 2,
+            "filesModified": 5,
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, AutomodeCompleteEvent)
+    assert event.files_modified == 5
+
+
+@pytest.mark.asyncio
+async def test_automode_completion_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed completion events remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.automode.complete",
+        "params": {
+            "sessionId": "automode-1",
+            "iterations": 8,
+            "filesCreated": 2,
+            "filesModified": "five",
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["files_modified"] == "five"

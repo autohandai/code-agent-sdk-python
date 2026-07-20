@@ -55,6 +55,7 @@ __all__ = [
     "SDKEvent",
     "TypedSDKEvent",
     "AutomodeIterationEvent",
+    "AutomodeCompleteEvent",
     "parse_sdk_event",
     "PromptParams",
     "PromptResult",

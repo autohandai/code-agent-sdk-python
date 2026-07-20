@@ -84,6 +84,7 @@ RPC_METHODS = {
 
 NOTIFICATION_EVENT_TYPES = {
     "autohand.automode.iteration": "automode_iteration",
+    "autohand.automode.complete": "automode_complete",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
@@ -135,6 +136,8 @@ CAMEL_TO_SNAKE_KEYS = {
     "remainingBytes": "remaining_bytes",
     "evaluatorMode": "evaluator_mode",
     "driftWarnings": "drift_warnings",
+    "filesCreated": "files_created",
+    "filesModified": "files_modified",
 }
 
 EVENT_BACKLOG_LIMIT = 1_024
