@@ -76,6 +76,8 @@ from autohand_sdk.types import (
     GoalTemplateMetadata,
     GoalTemplatesResult,
     InstallSkillResult,
+    LearnRecommendParams,
+    LearnRecommendResult,
     McpGetServerConfigsResult,
     McpInvokeResponseParams,
     McpInvokeResponseResult,
@@ -587,6 +589,18 @@ class AutohandSDK:
             params.model_dump(by_alias=True, exclude_none=True)
         )
         return McpInvokeResponseResult.model_validate(response)
+
+    async def get_learning_recommendations(
+        self, *, deep: bool | None = None
+    ) -> LearnRecommendResult:
+        """Audit project skills and return relevant recommendations."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = LearnRecommendParams(deep=deep)
+        response = await self._client.get_learning_recommendations(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return LearnRecommendResult.model_validate(response)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

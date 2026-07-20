@@ -26,6 +26,7 @@ from autohand_sdk.types import (
     GoalSnapshotResult,
     GoalTemplatesResult,
     InstallSkillResult,
+    LearnRecommendResult,
     McpGetServerConfigsResult,
     McpInvokeResponseResult,
     McpListServersResult,
@@ -151,6 +152,12 @@ class Agent:
             result=result,
             error=error,
         )
+
+    async def get_learning_recommendations(
+        self, *, deep: bool | None = None
+    ) -> LearnRecommendResult:
+        """Audit project skills and return relevant recommendations."""
+        return await self._sdk.get_learning_recommendations(deep=deep)
 
     async def create_browser_handoff(
         self,

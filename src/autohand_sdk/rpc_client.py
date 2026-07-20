@@ -45,6 +45,7 @@ RPC_METHODS = {
     "yolo_set_compat": "autohand.yolo.set",
     "mcp_set_vscode_tools": "autohand.mcp.setVscodeTools",
     "mcp_invoke_response": "autohand.mcp.invokeResponse",
+    "learn_recommend": "autohand.learn.recommend",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -562,6 +563,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["mcp_invoke_response"], params),
+        )
+
+    async def get_learning_recommendations(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Audit project skills and return relevant recommendations."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["learn_recommend"], params),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

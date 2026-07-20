@@ -1580,6 +1580,39 @@ class McpInvokeResponseResult(StrictRPCContractModel):
     success: bool
 
 
+class LearnRecommendParams(StrictRPCContractModel):
+    """Options for auditing project skills and recommendations."""
+
+    deep: bool | None = None
+
+
+class LearnAuditEntry(StrictRPCContractModel):
+    """One installed-skill audit finding."""
+
+    skill: str
+    status: Literal["redundant", "outdated", "conflicting"]
+    reason: str
+
+
+class LearnRecommendation(StrictRPCContractModel):
+    """One project-relevant skill recommendation."""
+
+    slug: str
+    score: float
+    reason: str
+
+
+class LearnRecommendResult(StrictRPCContractModel):
+    """Project learning audit and recommendations."""
+
+    success: bool
+    project_summary: str
+    audit: list[LearnAuditEntry]
+    recommendations: list[LearnRecommendation]
+    gap_analysis: str | None
+    error: str | None = None
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

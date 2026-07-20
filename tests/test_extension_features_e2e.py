@@ -453,3 +453,43 @@ async def test_mcp_invocation_response_rejects_malformed_ack(tmp_path: Path) -> 
             cli,
             lambda sdk: sdk.respond_to_mcp_invocation("mcp-1", success=False, error="failed"),
         )
+
+
+@pytest.mark.asyncio
+async def test_learning_recommendations_use_spawned_cli(tmp_path: Path) -> None:
+    """The SDK returns typed project learning recommendations."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.recommend",
+        params={"deep": True},
+        result={
+            "success": True,
+            "projectSummary": "Python SDK",
+            "audit": [{"skill": "old-testing", "status": "outdated", "reason": "Retired command"}],
+            "recommendations": [
+                {"slug": "python-best-practices", "score": 0.97, "reason": "Matches repo"}
+            ],
+            "gapAnalysis": None,
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.get_learning_recommendations(deep=True))
+    assert result.recommendations[0].score == 0.97
+
+
+@pytest.mark.asyncio
+async def test_learning_recommendations_reject_malformed_score(tmp_path: Path) -> None:
+    """Non-numeric recommendation scores fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.learn.recommend",
+        params={},
+        result={
+            "success": True,
+            "projectSummary": "SDK",
+            "audit": [],
+            "recommendations": [{"slug": "testing", "score": "high", "reason": "Useful"}],
+            "gapAnalysis": "Needs integration tests",
+        },
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.get_learning_recommendations())
