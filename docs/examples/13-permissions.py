@@ -1,4 +1,5 @@
 """13 Permissions - respond to permission requests from Python."""
+
 from __future__ import annotations
 
 import asyncio
@@ -12,9 +13,7 @@ async def main() -> None:
     """Demonstrate a host-controlled permission response."""
     workspace = example_workspace("permissions")
 
-    async with AutohandSDK(
-        **sdk_config(cwd=str(workspace), permission_mode="default")
-    ) as sdk:
+    async with AutohandSDK(**sdk_config(cwd=str(workspace), permission_mode="default")) as sdk:
         async for event in sdk.stream_prompt(
             "Create a file named permission_example.txt with one sentence."
         ):

@@ -1,4 +1,5 @@
 """20 SDLC Discovery Plan - ask for a read-only discovery and plan."""
+
 from __future__ import annotations
 
 import asyncio
@@ -19,9 +20,7 @@ async def main() -> None:
         ]
     )
 
-    async with AutohandSDK(
-        **sdk_config(permission_mode="default", skill_refs=["testing"])
-    ) as sdk:
+    async with AutohandSDK(**sdk_config(permission_mode="default", skill_refs=["testing"])) as sdk:
         await print_stream(sdk, prompt)
 
 

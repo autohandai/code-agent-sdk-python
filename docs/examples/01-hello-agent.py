@@ -1,4 +1,5 @@
 """01 Hello Agent - minimal Autohand SDK usage."""
+
 from __future__ import annotations
 
 import asyncio

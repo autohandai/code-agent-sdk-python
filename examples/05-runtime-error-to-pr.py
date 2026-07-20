@@ -3,6 +3,7 @@
 This variant uses the package-level example style. For the full documented
 version, see docs/examples/26-runtime-error-to-pr.py.
 """
+
 from __future__ import annotations
 
 import asyncio

@@ -1,4 +1,5 @@
 """06 Prompt Skills - make named skills available for prompt references."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,9 +15,7 @@ async def main() -> None:
         skill_refs=["typescript", "testing", "react"],
     )
 
-    prompt = (
-        "Using /skill testing, suggest a focused test plan for this Python SDK."
-    )
+    prompt = "Using /skill testing, suggest a focused test plan for this Python SDK."
 
     async with AutohandSDK(**config) as sdk:
         await print_stream(sdk, prompt)

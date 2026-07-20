@@ -1,4 +1,5 @@
 """21 SDLC Gated Implementation - implement only after explicit permission."""
+
 from __future__ import annotations
 
 import asyncio

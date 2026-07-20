@@ -3,6 +3,7 @@
 This example demonstrates the simplest possible usage of the Autohand SDK
 to send a prompt and receive a response.
 """
+
 import asyncio
 import os
 

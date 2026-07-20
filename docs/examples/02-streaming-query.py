@@ -1,4 +1,5 @@
 """02 Streaming Query - handle each event type explicitly."""
+
 from __future__ import annotations
 
 import asyncio

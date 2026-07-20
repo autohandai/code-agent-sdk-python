@@ -1,4 +1,5 @@
 """Shared helpers for Autohand SDK examples."""
+
 from __future__ import annotations
 
 import os

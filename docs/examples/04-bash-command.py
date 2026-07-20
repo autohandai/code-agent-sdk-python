@@ -1,4 +1,5 @@
 """04 Bash Command - observe tool calls that run commands."""
+
 from __future__ import annotations
 
 import asyncio

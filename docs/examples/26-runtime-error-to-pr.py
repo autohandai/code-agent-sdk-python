@@ -4,6 +4,7 @@ Capture an application runtime error and ask Autohand to turn it into a focused
 repair pull request. Set AUTOHAND_TARGET_REPO to the app repository that should
 receive the branch, commit, push, and pull request.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -35,10 +36,10 @@ def capture_runtime_error() -> str:
     return "\n".join(
         [
             "RuntimeError: checkout discount failed: 'NoneType' object is not subscriptable",
-            "  File \"src/checkout/discounts.py\", line 42, in checkout_discount",
-            "  File \"src/checkout/session.py\", line 88, in create_checkout_session",
+            '  File "src/checkout/discounts.py", line 42, in checkout_discount',
+            '  File "src/checkout/session.py", line 88, in create_checkout_session',
             "Request: POST /checkout",
-            "Payload: {\"subtotal\": 129, \"customer\": null}",
+            'Payload: {"subtotal": 129, "customer": null}',
         ]
     )
 

@@ -1,4 +1,5 @@
 """22 SDLC Release Readiness - ask the agent to run production gates."""
+
 from __future__ import annotations
 
 import asyncio
@@ -21,9 +22,7 @@ async def main() -> None:
 
     tool_results: list[tuple[str, object]] = []
 
-    async with AutohandSDK(
-        **sdk_config(permission_mode="default", skill_refs=["testing"])
-    ) as sdk:
+    async with AutohandSDK(**sdk_config(permission_mode="default", skill_refs=["testing"])) as sdk:
         async for event in sdk.stream_prompt(prompt):
             if event["type"] == "message_update":
                 print(event.get("delta", ""), end="", flush=True)

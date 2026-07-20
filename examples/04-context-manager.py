@@ -3,6 +3,7 @@
 This example shows how to use the SDK with an async context manager
 for automatic cleanup.
 """
+
 import asyncio
 import os
 

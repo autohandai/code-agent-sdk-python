@@ -8,6 +8,7 @@ Required:
     AUTOHAND_TARGET_REPO=/path/to/app
     GITHUB_TOKEN or GH_TOKEN with repo scope
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +25,7 @@ from autohand_sdk import AutohandSDK
 @dataclass(frozen=True)
 class GitHubCredentials:
     """GitHub authentication and repository hints for the workflow."""
+
     token_env_name: str
     remote: str
     base_branch: str
@@ -33,6 +35,7 @@ class GitHubCredentials:
 @dataclass(frozen=True)
 class IncidentPacket:
     """Normalized production incident input for the repair workflow."""
+
     id: str
     severity: str
     service: str
@@ -78,9 +81,9 @@ def capture_incident_packet() -> IncidentPacket:
         stack_trace="\n".join(
             [
                 "RuntimeError: checkout discount failed while replaying coupon idempotency key",
-                "  File \"src/checkout/discounts.py\", line 42, in calculate_discount",
-                "  File \"src/checkout/payment_intent.py\", line 118, in build_payment_intent",
-                "  File \"src/checkout/session.py\", line 88, in create_checkout_session",
+                '  File "src/checkout/discounts.py", line 42, in calculate_discount',
+                '  File "src/checkout/payment_intent.py", line 118, in build_payment_intent',
+                '  File "src/checkout/session.py", line 88, in create_checkout_session',
             ]
         ),
         logs=[

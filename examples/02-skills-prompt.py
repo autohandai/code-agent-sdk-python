@@ -3,6 +3,7 @@
 This example shows how to configure skills so the agent can reference
 them via /skill <name> in prompts. The SDK pre-loads the skills.
 """
+
 import asyncio
 import os
 

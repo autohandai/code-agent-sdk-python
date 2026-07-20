@@ -1,4 +1,5 @@
 """Example: Advanced runtime error to pull request."""
+
 from __future__ import annotations
 
 import asyncio
@@ -28,8 +29,8 @@ def incident_packet() -> dict[str, object]:
         "stack_trace": "\n".join(
             [
                 "RuntimeError: checkout discount failed while replaying coupon idempotency key",
-                "  File \"src/checkout/discounts.py\", line 42, in calculate_discount",
-                "  File \"src/checkout/session.py\", line 88, in create_checkout_session",
+                '  File "src/checkout/discounts.py", line 42, in calculate_discount',
+                '  File "src/checkout/session.py", line 88, in create_checkout_session',
             ]
         ),
         "suspected_files": [

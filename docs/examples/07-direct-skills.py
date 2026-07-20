@@ -1,4 +1,5 @@
 """07 Direct Skills - pass built-in skill names and local SKILL.md files."""
+
 from __future__ import annotations
 
 import asyncio
@@ -34,7 +35,7 @@ async def main() -> None:
             "testing",
             str(skill_file),
             {"name": "explicit-python-sdk-review", "path": str(skill_file)},
-        ]
+        ],
     )
 
     async with AutohandSDK(**config) as sdk:
