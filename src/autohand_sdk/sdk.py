@@ -13,6 +13,8 @@ from autohand_sdk.rpc_client import RPCClient
 from autohand_sdk.types import (
     AbortParams,
     AbortResult,
+    AutomodeCancelParams,
+    AutomodeCancelResult,
     AutomodeOperationResult,
     AutomodeResumeResult,
     AutomodeStartParams,
@@ -372,6 +374,15 @@ class AutohandSDK:
             raise RuntimeError("SDK not started")
 
         result = await self._client.resume_automode()
+        return AutomodeOperationResult.model_validate(result)
+
+    async def cancel_automode(self, reason: str | None = None) -> AutomodeCancelResult:
+        """Cancel the active autonomous execution session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = AutomodeCancelParams(reason=reason)
+        result = await self._client.cancel_automode(params.reason)
         return AutomodeOperationResult.model_validate(result)
 
     async def respond_to_permission(

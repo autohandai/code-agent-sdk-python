@@ -200,6 +200,9 @@ returns `AutomodeOperationResult`. A rejected operation remains a typed
 `resume_automode()` calls `autohand.automode.resume` with no parameters and
 returns the same operation-result shape.
 
+`cancel_automode(reason=None)` calls `autohand.automode.cancel`; the optional
+reason is omitted from the wire payload when it is `None`.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

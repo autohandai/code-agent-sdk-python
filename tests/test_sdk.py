@@ -470,6 +470,23 @@ class TestSDKMethods:
         assert result == AutomodeOperationResult(success=True)
 
     @pytest.mark.asyncio
+    async def test_cancel_automode_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"success": True},
+        ) as request:
+            result = await sdk.cancel_automode("Superseded")
+
+        request.assert_awaited_once_with(
+            "autohand.automode.cancel",
+            {"reason": "Superseded"},
+        )
+        assert result == AutomodeOperationResult(success=True)
+
+    @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:
         sdk = AutohandSDK()
         sdk._client = None

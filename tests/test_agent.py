@@ -124,6 +124,16 @@ async def test_resume_automode_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancel_automode_delegates_to_sdk() -> None:
+    """Agent exposes autonomous execution cancellation."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.cancel_automode = AsyncMock(return_value="cancelled")
+
+    assert await Agent.from_sdk(sdk).cancel_automode("Superseded") == "cancelled"
+    sdk.cancel_automode.assert_awaited_once_with("Superseded")
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

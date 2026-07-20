@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    AutomodeCancelResult,
     AutomodeOperationResult,
     AutomodeResumeResult,
     AutomodeStartResult,
@@ -107,6 +108,10 @@ class Agent:
     async def resume_automode(self) -> AutomodeResumeResult:
         """Resume a paused autonomous execution session."""
         return await self._sdk.resume_automode()
+
+    async def cancel_automode(self, reason: str | None = None) -> AutomodeCancelResult:
+        """Cancel the active autonomous execution session."""
+        return await self._sdk.cancel_automode(reason)
 
     async def command(
         self,

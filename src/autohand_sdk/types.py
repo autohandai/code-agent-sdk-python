@@ -1483,6 +1483,15 @@ class AutomodeResumeParams(RPCContractModel):
 AutomodeResumeResult: TypeAlias = AutomodeOperationResult
 
 
+class AutomodeCancelParams(RPCContractModel):
+    """Parameters for cancelling auto-mode."""
+
+    reason: str | None = None
+
+
+AutomodeCancelResult: TypeAlias = AutomodeOperationResult
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 
