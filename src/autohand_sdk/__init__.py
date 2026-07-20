@@ -102,6 +102,8 @@ __all__ = [
     "ToolRegistryEntry",
     "ToolRegistryDiagnostic",
     "GetToolsRegistryResult",
+    "SetContextCompactParams",
+    "SetContextCompactResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",

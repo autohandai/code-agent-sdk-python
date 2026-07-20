@@ -610,3 +610,29 @@ async def test_tools_registry_rejects_unknown_source(tmp_path: Path) -> None:
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.get_tools_registry())
+
+
+@pytest.mark.asyncio
+async def test_context_compaction_control_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK controls automatic context compaction through the CLI."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.setContextCompact",
+        params={"enabled": True},
+        result={"enabled": True},
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.set_context_compact(True))
+    assert result.enabled is True
+
+
+@pytest.mark.asyncio
+async def test_context_compaction_control_rejects_malformed_result(tmp_path: Path) -> None:
+    """Non-boolean compaction state fails result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.setContextCompact",
+        params={"enabled": False},
+        result={"enabled": 0},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.set_context_compact(False))

@@ -1677,6 +1677,18 @@ class GetToolsRegistryResult(StrictRPCContractModel):
     diagnostics: list[ToolRegistryDiagnostic]
 
 
+class SetContextCompactParams(StrictRPCContractModel):
+    """Automatic context-compaction setting."""
+
+    enabled: bool
+
+
+class SetContextCompactResult(StrictRPCContractModel):
+    """Current automatic context-compaction setting."""
+
+    enabled: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

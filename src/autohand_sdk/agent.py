@@ -40,6 +40,7 @@ from autohand_sdk.types import (
     ResetResult,
     SDKConfig,
     SessionAttachResult,
+    SetContextCompactResult,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
     YoloSetResult,
@@ -173,6 +174,10 @@ class Agent:
     async def get_tools_registry(self) -> GetToolsRegistryResult:
         """Return built-in, meta, and extension tool registry entries."""
         return await self._sdk.get_tools_registry()
+
+    async def set_context_compact(self, enabled: bool) -> SetContextCompactResult:
+        """Enable or disable automatic context compaction."""
+        return await self._sdk.set_context_compact(enabled)
 
     async def create_browser_handoff(
         self,

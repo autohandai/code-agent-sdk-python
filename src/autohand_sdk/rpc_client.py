@@ -49,6 +49,7 @@ RPC_METHODS = {
     "learn_update": "autohand.learn.update",
     "learn_generate": "autohand.learn.generate",
     "get_tools_registry": "autohand.getToolsRegistry",
+    "set_context_compact": "autohand.setContextCompact",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -594,6 +595,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["get_tools_registry"], {}),
+        )
+
+    async def set_context_compact(self, enabled: bool) -> dict[str, Any]:
+        """Enable or disable automatic context compaction."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["set_context_compact"], {"enabled": enabled}),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

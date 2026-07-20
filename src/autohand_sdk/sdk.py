@@ -99,6 +99,8 @@ from autohand_sdk.types import (
     SDKEvent,
     SessionAttachParams,
     SessionAttachResult,
+    SetContextCompactParams,
+    SetContextCompactResult,
     SkillReference,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
@@ -625,6 +627,14 @@ class AutohandSDK:
         if not self._client:
             raise RuntimeError("SDK not started")
         return GetToolsRegistryResult.model_validate(await self._client.get_tools_registry())
+
+    async def set_context_compact(self, enabled: bool) -> SetContextCompactResult:
+        """Enable or disable automatic context compaction."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = SetContextCompactParams(enabled=enabled)
+        response = await self._client.set_context_compact(params.enabled)
+        return SetContextCompactResult.model_validate(response)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.
