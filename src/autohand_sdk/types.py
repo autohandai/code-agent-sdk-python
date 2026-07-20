@@ -1191,6 +1191,15 @@ class AutomodeCompleteEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class AutomodeErrorEvent(StrictSDKEventModel):
+    """Failure emitted when auto-mode cannot continue."""
+
+    type: Literal["automode_error"] = "automode_error"
+    session_id: str
+    error: str
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1324,6 +1333,7 @@ class AutoresearchOperationEvent(AutoresearchModel):
 TypedSDKEvent: TypeAlias = (
     AutomodeIterationEvent
     | AutomodeCompleteEvent
+    | AutomodeErrorEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1341,6 +1351,7 @@ SDKEvent: TypeAlias = dict[str, Any]
 EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "automode_iteration": AutomodeIterationEvent,
     "automode_complete": AutomodeCompleteEvent,
+    "automode_error": AutomodeErrorEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

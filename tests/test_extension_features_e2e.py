@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from autohand_sdk import (
     AutohandSDK,
     AutomodeCompleteEvent,
+    AutomodeErrorEvent,
     AutomodeIterationEvent,
     SDKConfig,
 )
@@ -747,3 +748,31 @@ async def test_automode_completion_event_preserves_malformed_fallback(tmp_path: 
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["files_modified"] == "five"
+
+
+@pytest.mark.asyncio
+async def test_automode_error_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types auto-mode errors."""
+    notification = {
+        "method": "autohand.automode.error",
+        "params": {"sessionId": "automode-1", "error": "Budget exceeded", "timestamp": "t1"},
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, AutomodeErrorEvent)
+    assert event.error == "Budget exceeded"
+
+
+@pytest.mark.asyncio
+async def test_automode_error_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed auto-mode errors remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.automode.error",
+        "params": {"sessionId": "automode-1", "error": {"message": "bad"}, "timestamp": "t1"},
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["error"] == {"message": "bad"}
