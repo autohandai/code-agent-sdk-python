@@ -97,3 +97,32 @@ async def test_permission_acknowledgement_rejects_malformed_result(tmp_path: Pat
 
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.acknowledge_permission("permission-1"))
+
+
+@pytest.mark.asyncio
+async def test_directory_access_response_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK sends the exact directory grant and returns a typed result."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.directoryAccessResponse",
+        params={"requestId": "directory-1", "granted": True},
+        result={"success": True},
+    )
+
+    result = await _with_sdk(cli, lambda sdk: sdk.respond_to_directory_access("directory-1", True))
+
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_directory_access_response_rejects_malformed_result(tmp_path: Path) -> None:
+    """Malformed directory response results fail at the SDK trust boundary."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.directoryAccessResponse",
+        params={"requestId": "directory-1", "granted": False},
+        result={"success": 1},
+    )
+
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.respond_to_directory_access("directory-1", False))

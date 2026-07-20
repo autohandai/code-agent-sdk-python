@@ -15,6 +15,7 @@ from autohand_sdk.types import (
     BrowserHandoffAttachLatestResult,
     BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
+    DirectoryAccessResponseResult,
     GetSkillsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
@@ -64,6 +65,12 @@ class Agent:
     async def acknowledge_permission(self, request_id: str) -> PermissionAcknowledgedResult:
         """Acknowledge receipt of a permission request before deciding it."""
         return await self._sdk.acknowledge_permission(request_id)
+
+    async def respond_to_directory_access(
+        self, request_id: str, granted: bool
+    ) -> DirectoryAccessResponseResult:
+        """Grant or deny a pending directory-access request."""
+        return await self._sdk.respond_to_directory_access(request_id, granted)
 
     async def create_browser_handoff(
         self,

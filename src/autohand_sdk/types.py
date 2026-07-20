@@ -1376,6 +1376,19 @@ class PermissionAcknowledgedResult(StrictRPCContractModel):
     success: bool
 
 
+class DirectoryAccessResponseParams(StrictRPCContractModel):
+    """Parameters for granting or denying a directory-access request."""
+
+    request_id: str = Field(..., min_length=1)
+    granted: bool
+
+
+class DirectoryAccessResponseResult(StrictRPCContractModel):
+    """Result returned after resolving directory access."""
+
+    success: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

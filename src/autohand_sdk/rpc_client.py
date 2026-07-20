@@ -35,6 +35,7 @@ RPC_METHODS = {
     "automode_get_log": "autohand.automode.getLog",
     "permission_response": "autohand.permissionResponse",
     "permission_acknowledged": "autohand.permissionAcknowledged",
+    "directory_access_response": "autohand.directoryAccessResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -472,6 +473,16 @@ class RPCClient:
             await self._request(
                 RPC_METHODS["permission_acknowledged"],
                 {"requestId": request_id},
+            ),
+        )
+
+    async def respond_to_directory_access(self, request_id: str, granted: bool) -> dict[str, Any]:
+        """Grant or deny a pending directory-access request."""
+        return cast(
+            dict[str, Any],
+            await self._request(
+                RPC_METHODS["directory_access_response"],
+                {"requestId": request_id, "granted": granted},
             ),
         )
 
