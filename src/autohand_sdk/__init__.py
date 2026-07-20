@@ -77,6 +77,8 @@ __all__ = [
     "AutomodeState",
     "AutomodeStatusParams",
     "AutomodeStatusResult",
+    "AutomodePauseParams",
+    "AutomodeOperationResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

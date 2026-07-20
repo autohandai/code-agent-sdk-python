@@ -1465,6 +1465,17 @@ class AutomodeStatusResult(RPCContractModel):
     state: AutomodeState | None = None
 
 
+class AutomodePauseParams(RPCContractModel):
+    """Parameters for pausing auto-mode."""
+
+
+class AutomodeOperationResult(RPCContractModel):
+    """Result from an auto-mode control operation."""
+
+    success: bool
+    error: str | None = None
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

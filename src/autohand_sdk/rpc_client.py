@@ -29,6 +29,7 @@ RPC_METHODS = {
     "browser_handoff_attach_latest": "autohand.browserHandoff.attachLatest",
     "automode_start": "autohand.automode.start",
     "automode_status": "autohand.automode.status",
+    "automode_pause": "autohand.automode.pause",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -424,6 +425,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["automode_status"], {}),
+        )
+
+    async def pause_automode(self) -> dict[str, Any]:
+        """Pause the active autonomous execution session."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["automode_pause"], {}),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:

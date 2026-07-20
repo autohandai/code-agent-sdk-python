@@ -193,6 +193,10 @@ started = await sdk.start_automode(
 `AutomodeStatusResult`. When present, `state` includes iteration and file
 counts, branch, and a typed latest checkpoint.
 
+`pause_automode()` calls `autohand.automode.pause` with no parameters and
+returns `AutomodeOperationResult`. A rejected operation remains a typed
+`success=False` result with the optional CLI error.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

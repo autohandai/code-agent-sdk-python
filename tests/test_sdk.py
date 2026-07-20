@@ -8,6 +8,7 @@ import pytest
 
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
+    AutomodeOperationResult,
     AutomodeStartResult,
     AutomodeStatusResult,
     AutoresearchStartResult,
@@ -436,6 +437,23 @@ class TestSDKMethods:
         assert result.state.current_iteration == 3
         assert result.state.last_checkpoint is not None
         assert result.state.last_checkpoint.commit == "abc123"
+
+    @pytest.mark.asyncio
+    async def test_pause_automode_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"success": False, "error": "No active auto-mode session"},
+        ) as request:
+            result = await sdk.pause_automode()
+
+        request.assert_awaited_once_with("autohand.automode.pause", {})
+        assert result == AutomodeOperationResult(
+            success=False,
+            error="No active auto-mode session",
+        )
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:
