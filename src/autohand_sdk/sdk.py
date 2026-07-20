@@ -34,6 +34,8 @@ from autohand_sdk.types import (
     AutoresearchStatusResult,
     AutoresearchStopResult,
     AutoresearchSubagentOptions,
+    BrowserHandoffCreateParams,
+    BrowserHandoffCreateResult,
     CreateGoalParams,
     FeatureFlagSettings,
     GetMessagesParams,
@@ -268,6 +270,25 @@ class AutohandSDK:
 
         result = await self._client.reset()
         return ResetResult.model_validate(result)
+
+    async def create_browser_handoff(
+        self,
+        extension_id: str | None = None,
+        install_url: str | None = None,
+    ) -> BrowserHandoffCreateResult:
+        """Create a browser handoff for the active session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = BrowserHandoffCreateParams(
+            extension_id=extension_id,
+            install_url=install_url,
+        )
+        result = await self._client.create_browser_handoff(
+            extension_id=params.extension_id,
+            install_url=params.install_url,
+        )
+        return BrowserHandoffCreateResult.model_validate(result)
 
     async def respond_to_permission(
         self,

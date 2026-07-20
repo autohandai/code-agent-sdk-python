@@ -9,6 +9,7 @@ import pytest
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
     AutoresearchStartResult,
+    BrowserHandoffCreateResult,
     FeatureFlagSettings,
     GoalFeatureDisabledResult,
     GoalMutationResult,
@@ -293,6 +294,35 @@ class TestSDKMethods:
 
         request.assert_awaited_once_with("autohand.reset", {})
         assert result == ResetResult(session_id="session-new")
+
+    @pytest.mark.asyncio
+    async def test_create_browser_handoff_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {
+            "token": "token-1",
+            "sessionId": "session-1",
+            "workspaceRoot": "/workspace",
+            "createdAt": "2026-07-20T00:00:00.000Z",
+            "expiresAt": "2026-07-20T00:10:00.000Z",
+            "url": "chrome-extension://ext/sidepanel.html?handoff=token-1",
+        }
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.create_browser_handoff(
+                extension_id="ext",
+                install_url="https://example.test/install",
+            )
+
+        request.assert_awaited_once_with(
+            "autohand.browserHandoff.create",
+            {"extensionId": "ext", "installUrl": "https://example.test/install"},
+        )
+        assert result == BrowserHandoffCreateResult.model_validate(wire_result)
+        assert result.workspace_root == "/workspace"
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:

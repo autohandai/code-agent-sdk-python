@@ -64,6 +64,8 @@ __all__ = [
     "PermissionResponseParams",
     "ResetParams",
     "ResetResult",
+    "BrowserHandoffCreateParams",
+    "BrowserHandoffCreateResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

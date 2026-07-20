@@ -148,6 +148,18 @@ print(reset.session_id)
 `reset()` calls `autohand.reset` with an empty parameter object and returns a
 typed `ResetResult`. The same method is available on `Agent`.
 
+## Browser handoffs
+
+```python
+handoff = await sdk.create_browser_handoff(extension_id="your-extension-id")
+print(handoff.url)
+```
+
+`create_browser_handoff(extension_id=None, install_url=None)` calls
+`autohand.browserHandoff.create`. Optional Python arguments are encoded as
+`extensionId` and `installUrl`; the typed result contains the token, session,
+workspace, creation and expiry timestamps, and launch URL.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

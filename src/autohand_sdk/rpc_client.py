@@ -24,6 +24,7 @@ RPC_METHODS = {
     "prompt": "autohand.prompt",
     "abort": "autohand.abort",
     "reset": "autohand.reset",
+    "browser_handoff_create": "autohand.browserHandoff.create",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -356,6 +357,22 @@ class RPCClient:
     async def reset(self) -> dict[str, Any]:
         """Reset the conversation context and return the new session ID."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["reset"], {}))
+
+    async def create_browser_handoff(
+        self,
+        extension_id: str | None = None,
+        install_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a browser handoff for the active session."""
+        params: dict[str, Any] = {}
+        if extension_id is not None:
+            params["extensionId"] = extension_id
+        if install_url is not None:
+            params["installUrl"] = install_url
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["browser_handoff_create"], params),
+        )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:
         """Respond to a permission request."""

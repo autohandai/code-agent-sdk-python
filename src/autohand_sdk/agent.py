@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    BrowserHandoffCreateResult,
     GetSkillsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
@@ -50,6 +51,14 @@ class Agent:
     async def reset(self) -> ResetResult:
         """Reset the conversation context."""
         return await self._sdk.reset()
+
+    async def create_browser_handoff(
+        self,
+        extension_id: str | None = None,
+        install_url: str | None = None,
+    ) -> BrowserHandoffCreateResult:
+        """Create a browser handoff for the active session."""
+        return await self._sdk.create_browser_handoff(extension_id, install_url)
 
     async def command(
         self,

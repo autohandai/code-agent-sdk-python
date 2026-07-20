@@ -38,6 +38,18 @@ async def test_reset_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_browser_handoff_delegates_to_sdk() -> None:
+    """Agent exposes browser handoff creation."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.create_browser_handoff = AsyncMock(return_value="handoff")
+
+    result = await Agent.from_sdk(sdk).create_browser_handoff("ext", "https://install.test")
+
+    assert result == "handoff"
+    sdk.create_browser_handoff.assert_awaited_once_with("ext", "https://install.test")
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

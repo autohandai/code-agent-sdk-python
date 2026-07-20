@@ -1363,6 +1363,24 @@ class ResetResult(RPCContractModel):
     session_id: str
 
 
+class BrowserHandoffCreateParams(RPCContractModel):
+    """Parameters for creating a browser handoff."""
+
+    extension_id: str | None = None
+    install_url: str | None = None
+
+
+class BrowserHandoffCreateResult(RPCContractModel):
+    """A newly-created browser handoff token and launch URL."""
+
+    token: str
+    session_id: str
+    workspace_root: str
+    created_at: str
+    expires_at: str
+    url: str
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 
