@@ -38,6 +38,7 @@ RPC_METHODS = {
     "directory_access_response": "autohand.directoryAccessResponse",
     "directory_access_acknowledged": "autohand.directoryAccessAcknowledged",
     "changes_decision": "autohand.changesDecision",
+    "get_history": "autohand.getHistory",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -503,6 +504,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["changes_decision"], params),
+        )
+
+    async def get_history(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Return paginated saved-session metadata."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["get_history"], params),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

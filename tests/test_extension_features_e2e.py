@@ -195,3 +195,60 @@ async def test_multi_file_change_decision_rejects_malformed_count(tmp_path: Path
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.decide_changes("batch-1", "accept_all"))
+
+
+@pytest.mark.asyncio
+async def test_session_history_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK returns paginated typed session history."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getHistory",
+        params={"page": 2, "pageSize": 10},
+        result={
+            "sessions": [
+                {
+                    "sessionId": "session-1",
+                    "createdAt": "t1",
+                    "lastActiveAt": "t2",
+                    "projectName": "tin-wrapper",
+                    "model": "fantail",
+                    "messageCount": 4,
+                    "status": "completed",
+                }
+            ],
+            "currentPage": 2,
+            "totalPages": 4,
+            "totalItems": 31,
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.get_history(page=2, page_size=10))
+    assert result.sessions[0].session_id == "session-1"
+    assert result.total_items == 31
+
+
+@pytest.mark.asyncio
+async def test_session_history_rejects_unknown_status(tmp_path: Path) -> None:
+    """Unknown session statuses fail result validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getHistory",
+        params={},
+        result={
+            "sessions": [
+                {
+                    "sessionId": "session-1",
+                    "createdAt": "t1",
+                    "lastActiveAt": "t2",
+                    "projectName": "tin-wrapper",
+                    "model": "fantail",
+                    "messageCount": 4,
+                    "status": "deleted",
+                }
+            ],
+            "currentPage": 1,
+            "totalPages": 1,
+            "totalItems": 1,
+        },
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.get_history())

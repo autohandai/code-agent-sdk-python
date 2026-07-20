@@ -57,6 +57,8 @@ from autohand_sdk.types import (
     DirectoryAccessResponseParams,
     DirectoryAccessResponseResult,
     FeatureFlagSettings,
+    GetHistoryParams,
+    GetHistoryResult,
     GetMessagesParams,
     GetMessagesResult,
     GetSkillsRegistryResult,
@@ -486,6 +488,19 @@ class AutohandSDK:
             params.model_dump(by_alias=True, exclude_none=True)
         )
         return ChangesDecisionResult.model_validate(result)
+
+    async def get_history(
+        self,
+        *,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> GetHistoryResult:
+        """Return paginated saved-session metadata."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = GetHistoryParams(page=page, page_size=page_size)
+        result = await self._client.get_history(params.model_dump(by_alias=True, exclude_none=True))
+        return GetHistoryResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

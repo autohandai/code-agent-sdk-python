@@ -1428,6 +1428,34 @@ class ChangesDecisionResult(StrictRPCContractModel):
     errors: list[ChangesDecisionError] = Field(default_factory=list)
 
 
+class GetHistoryParams(StrictRPCContractModel):
+    """Pagination options for saved session history."""
+
+    page: int | None = Field(None, ge=1)
+    page_size: int | None = Field(None, ge=1)
+
+
+class RPCHistoryEntry(StrictRPCContractModel):
+    """One saved session summary returned by the CLI."""
+
+    session_id: str
+    created_at: str
+    last_active_at: str
+    project_name: str
+    model: str
+    message_count: int
+    status: Literal["active", "completed", "crashed"]
+
+
+class GetHistoryResult(StrictRPCContractModel):
+    """Paginated saved session history."""
+
+    sessions: list[RPCHistoryEntry]
+    current_page: int
+    total_pages: int
+    total_items: int
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

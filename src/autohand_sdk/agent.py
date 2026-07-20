@@ -19,6 +19,7 @@ from autohand_sdk.types import (
     ChangesDecisionResult,
     DirectoryAccessAcknowledgedResult,
     DirectoryAccessResponseResult,
+    GetHistoryResult,
     GetSkillsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
@@ -94,6 +95,15 @@ class Agent:
             action,
             selected_change_ids=selected_change_ids,
         )
+
+    async def get_history(
+        self,
+        *,
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> GetHistoryResult:
+        """Return paginated saved-session metadata."""
+        return await self._sdk.get_history(page=page, page_size=page_size)
 
     async def create_browser_handoff(
         self,
