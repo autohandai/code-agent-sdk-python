@@ -36,6 +36,7 @@ RPC_METHODS = {
     "permission_response": "autohand.permissionResponse",
     "permission_acknowledged": "autohand.permissionAcknowledged",
     "directory_access_response": "autohand.directoryAccessResponse",
+    "directory_access_acknowledged": "autohand.directoryAccessAcknowledged",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -483,6 +484,16 @@ class RPCClient:
             await self._request(
                 RPC_METHODS["directory_access_response"],
                 {"requestId": request_id, "granted": granted},
+            ),
+        )
+
+    async def acknowledge_directory_access(self, request_id: str) -> dict[str, Any]:
+        """Acknowledge receipt of a directory-access request."""
+        return cast(
+            dict[str, Any],
+            await self._request(
+                RPC_METHODS["directory_access_acknowledged"],
+                {"requestId": request_id},
             ),
         )
 

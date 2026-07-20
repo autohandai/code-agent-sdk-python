@@ -66,6 +66,8 @@ __all__ = [
     "PermissionAcknowledgedResult",
     "DirectoryAccessResponseParams",
     "DirectoryAccessResponseResult",
+    "DirectoryAccessAcknowledgedParams",
+    "DirectoryAccessAcknowledgedResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",

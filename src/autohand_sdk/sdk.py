@@ -49,6 +49,8 @@ from autohand_sdk.types import (
     BrowserHandoffCreateParams,
     BrowserHandoffCreateResult,
     CreateGoalParams,
+    DirectoryAccessAcknowledgedParams,
+    DirectoryAccessAcknowledgedResult,
     DirectoryAccessResponseParams,
     DirectoryAccessResponseResult,
     FeatureFlagSettings,
@@ -451,6 +453,16 @@ class AutohandSDK:
         params = DirectoryAccessResponseParams(request_id=request_id, granted=granted)
         result = await self._client.respond_to_directory_access(params.request_id, params.granted)
         return DirectoryAccessResponseResult.model_validate(result)
+
+    async def acknowledge_directory_access(
+        self, request_id: str
+    ) -> DirectoryAccessAcknowledgedResult:
+        """Acknowledge receipt of a directory-access request."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = DirectoryAccessAcknowledgedParams(request_id=request_id)
+        result = await self._client.acknowledge_directory_access(params.request_id)
+        return DirectoryAccessAcknowledgedResult.model_validate(result)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

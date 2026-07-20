@@ -1389,6 +1389,18 @@ class DirectoryAccessResponseResult(StrictRPCContractModel):
     success: bool
 
 
+class DirectoryAccessAcknowledgedParams(StrictRPCContractModel):
+    """Parameters for acknowledging receipt of a directory-access request."""
+
+    request_id: str = Field(..., min_length=1)
+
+
+class DirectoryAccessAcknowledgedResult(StrictRPCContractModel):
+    """Result returned after acknowledging directory access."""
+
+    success: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 
