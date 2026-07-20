@@ -48,6 +48,7 @@ RPC_METHODS = {
     "learn_recommend": "autohand.learn.recommend",
     "learn_update": "autohand.learn.update",
     "learn_generate": "autohand.learn.generate",
+    "get_tools_registry": "autohand.getToolsRegistry",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
@@ -586,6 +587,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["learn_generate"], params),
+        )
+
+    async def get_tools_registry(self) -> dict[str, Any]:
+        """Return built-in, meta, and extension tool registry entries."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["get_tools_registry"], {}),
         )
 
     async def get_state(self, params: dict[str, Any] | None = None) -> dict[str, Any]:

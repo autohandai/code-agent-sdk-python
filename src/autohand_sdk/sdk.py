@@ -68,6 +68,7 @@ from autohand_sdk.types import (
     GetSkillsRegistryResult,
     GetStateParams,
     GetStateResult,
+    GetToolsRegistryResult,
     GoalFeatureDisabledResult,
     GoalMutationResult,
     GoalMutationRPCResult,
@@ -618,6 +619,12 @@ class AutohandSDK:
         params = LearnGenerateParams(scope=scope)
         response = await self._client.generate_skill(params.model_dump(by_alias=True))
         return LearnGenerateResult.model_validate(response)
+
+    async def get_tools_registry(self) -> GetToolsRegistryResult:
+        """Return built-in, meta, and extension tool registry entries."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return GetToolsRegistryResult.model_validate(await self._client.get_tools_registry())
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

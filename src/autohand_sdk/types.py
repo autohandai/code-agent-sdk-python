@@ -1645,6 +1645,38 @@ class LearnGenerateResult(StrictRPCContractModel):
     error: str | None = None
 
 
+class ToolRegistryEntry(StrictRPCContractModel):
+    """One registered built-in, meta, or extension tool."""
+
+    name: str
+    description: str
+    requires_approval: bool | None = None
+    approval_message: str | None = None
+    source: Literal["builtin", "meta", "extension"]
+    scope: Literal["user", "project"] | None = None
+    disabled: bool | None = None
+    created_at: str | None = None
+    schema_version: int | None = None
+    handler_preview: str | None = None
+    reuse_hint: str | None = None
+    extension_id: str | None = None
+    extension_version: str | None = None
+
+
+class ToolRegistryDiagnostic(StrictRPCContractModel):
+    """One diagnostic emitted while loading registry entries."""
+
+    file: str
+    reason: str
+
+
+class GetToolsRegistryResult(StrictRPCContractModel):
+    """Typed tool registry and load diagnostics."""
+
+    tools: list[ToolRegistryEntry]
+    diagnostics: list[ToolRegistryDiagnostic]
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 

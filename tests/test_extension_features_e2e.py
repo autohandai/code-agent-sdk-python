@@ -563,3 +563,50 @@ async def test_skill_generation_rejects_malformed_path(tmp_path: Path) -> None:
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.generate_skill("user"))
+
+
+@pytest.mark.asyncio
+async def test_tools_registry_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK returns typed built-in, meta, and extension tools."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getToolsRegistry",
+        params={},
+        result={
+            "tools": [
+                {
+                    "name": "write_file",
+                    "description": "Write a file",
+                    "requiresApproval": True,
+                    "approvalMessage": "Allow writing?",
+                    "source": "builtin",
+                    "scope": "project",
+                    "disabled": False,
+                    "createdAt": "2026-07-20T00:00:00.000Z",
+                    "schemaVersion": 1,
+                    "handlerPreview": "write(path, content)",
+                    "reuseHint": "Use for complete replacement",
+                }
+            ],
+            "diagnostics": [{"file": "tool.json", "reason": "duplicate ignored"}],
+        },
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.get_tools_registry())
+    assert result.tools[0].requires_approval is True
+    assert result.diagnostics[0].file == "tool.json"
+
+
+@pytest.mark.asyncio
+async def test_tools_registry_rejects_unknown_source(tmp_path: Path) -> None:
+    """Unknown registry tool sources fail validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.getToolsRegistry",
+        params={},
+        result={
+            "tools": [{"name": "tool", "description": "Tool", "source": "remote"}],
+            "diagnostics": [],
+        },
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.get_tools_registry())

@@ -22,6 +22,7 @@ from autohand_sdk.types import (
     GetHistoryResult,
     GetSessionResult,
     GetSkillsRegistryResult,
+    GetToolsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
     GoalTemplatesResult,
@@ -168,6 +169,10 @@ class Agent:
     async def generate_skill(self, scope: Literal["project", "user"]) -> LearnGenerateResult:
         """Generate a reusable skill from the current project context."""
         return await self._sdk.generate_skill(scope)
+
+    async def get_tools_registry(self) -> GetToolsRegistryResult:
+        """Return built-in, meta, and extension tool registry entries."""
+        return await self._sdk.get_tools_registry()
 
     async def create_browser_handoff(
         self,
