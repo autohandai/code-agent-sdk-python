@@ -64,6 +64,8 @@ __all__ = [
     "McpInvokeRequestEvent",
     "McpToolSummary",
     "McpToolsChangedEvent",
+    "LearnProgressStatus",
+    "LearnProgressEvent",
     "parse_sdk_event",
     "PromptParams",
     "PromptResult",

@@ -20,6 +20,7 @@ from autohand_sdk import (
     HookPostToolEvent,
     HookPrePromptEvent,
     HookPreToolEvent,
+    LearnProgressEvent,
     McpInvokeRequestEvent,
     McpToolsChangedEvent,
     SDKConfig,
@@ -1007,3 +1008,57 @@ async def test_mcp_tools_changed_event_preserves_malformed_fallback(tmp_path: Pa
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["tools"][0]["serverName"] == 7
+
+
+@pytest.mark.asyncio
+async def test_learning_progress_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types project-learning progress."""
+    notification = {
+        "method": "autohand.learn.progress",
+        "params": {"status": "loading-registry", "timestamp": "t1"},
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, LearnProgressEvent)
+    assert event.status == "loading-registry"
+
+
+@pytest.mark.asyncio
+async def test_learning_progress_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed learning progress remains available as a raw notification."""
+    malformed = {
+        "method": "autohand.learn.progress",
+        "params": {"status": "done", "timestamp": "t1"},
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["status"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_unknown_notification_preserves_raw_public_fallback(tmp_path: Path) -> None:
+    """Notifications introduced by a newer CLI remain observable."""
+    notification = {
+        "method": "autohand.future.event",
+        "params": {"value": 7, "nested": {"retained": True}},
+    }
+    sentinel = {
+        "method": "autohand.error",
+        "params": {"code": 500, "message": "sentinel"},
+    }
+    cli = _feature_cli(
+        tmp_path,
+        method="unused",
+        params={},
+        result={},
+        notifications=[notification, sentinel],
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert event == {
+        "type": "unknown_notification",
+        "method": notification["method"],
+        "params": notification["params"],
+    }

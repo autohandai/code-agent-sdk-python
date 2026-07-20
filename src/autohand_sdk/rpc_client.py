@@ -92,6 +92,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.hook.postResponse": "hook_post_response",
     "autohand.mcp.invokeRequest": "mcp_invoke_request",
     "autohand.mcp.toolsChanged": "mcp_tools_changed",
+    "autohand.learn.progress": "learn_progress",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
@@ -957,6 +958,14 @@ class RPCClient:
 
         event_type = NOTIFICATION_EVENT_TYPES.get(method)
         if event_type is None:
+            raw_params = {key: value for key, value in params.items() if key != "_method"}
+            self._publish_event(
+                {
+                    "type": "unknown_notification",
+                    "method": method,
+                    "params": raw_params,
+                }
+            )
             return
 
         event = self._notification_to_event(event_type, params)

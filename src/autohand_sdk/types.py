@@ -1268,6 +1268,23 @@ class McpToolsChangedEvent(StrictSDKEventModel):
     timestamp: str
 
 
+LearnProgressStatus: TypeAlias = Literal[
+    "analyzing",
+    "loading-registry",
+    "evaluating",
+    "generating",
+    "updating",
+]
+
+
+class LearnProgressEvent(StrictSDKEventModel):
+    """Progress notification for project learning operations."""
+
+    type: Literal["learn_progress"] = "learn_progress"
+    status: LearnProgressStatus
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1408,6 +1425,7 @@ TypedSDKEvent: TypeAlias = (
     | HookPostResponseEvent
     | McpInvokeRequestEvent
     | McpToolsChangedEvent
+    | LearnProgressEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1432,6 +1450,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "hook_post_response": HookPostResponseEvent,
     "mcp_invoke_request": McpInvokeRequestEvent,
     "mcp_tools_changed": McpToolsChangedEvent,
+    "learn_progress": LearnProgressEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,
