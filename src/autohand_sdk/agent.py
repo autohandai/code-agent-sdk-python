@@ -15,6 +15,7 @@ from autohand_sdk.types import (
     McpListServersResult,
     McpListToolsResult,
     PromptResult,
+    ResetResult,
     SDKConfig,
     UpdateGoalParams,
 )
@@ -45,6 +46,10 @@ class Agent:
     async def close(self) -> None:
         """Close the underlying SDK session."""
         await self._sdk.close()
+
+    async def reset(self) -> ResetResult:
+        """Reset the conversation context."""
+        return await self._sdk.reset()
 
     async def command(
         self,

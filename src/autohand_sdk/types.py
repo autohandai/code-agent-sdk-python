@@ -1343,6 +1343,26 @@ def parse_sdk_event(event: SDKEvent) -> TypedSDKEvent | SDKEvent:
 # =============================================================================
 
 
+class RPCContractModel(BaseModel):
+    """Base model for lower-camel-case RPC contracts."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+    )
+
+
+class ResetParams(RPCContractModel):
+    """Parameters for resetting the conversation context."""
+
+
+class ResetResult(RPCContractModel):
+    """Result from resetting the conversation context."""
+
+    session_id: str
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

@@ -28,6 +28,16 @@ async def test_create_starts_and_close_stops_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_reset_delegates_to_sdk() -> None:
+    """Agent exposes conversation reset."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.reset = AsyncMock(return_value="reset")
+
+    assert await Agent.from_sdk(sdk).reset() == "reset"
+    sdk.reset.assert_awaited_once_with()
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)

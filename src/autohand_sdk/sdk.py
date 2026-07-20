@@ -55,6 +55,7 @@ from autohand_sdk.types import (
     PermissionResponseParams,
     PromptParams,
     PromptResult,
+    ResetResult,
     SDKConfig,
     SDKEvent,
     SkillReference,
@@ -259,6 +260,14 @@ class AutohandSDK:
         params = AbortParams(reason=reason)
         result = await self._client.abort(params.model_dump(by_alias=True, exclude_none=True))
         return AbortResult(**result)
+
+    async def reset(self) -> ResetResult:
+        """Reset the conversation context and return the new session ID."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        result = await self._client.reset()
+        return ResetResult.model_validate(result)
 
     async def respond_to_permission(
         self,

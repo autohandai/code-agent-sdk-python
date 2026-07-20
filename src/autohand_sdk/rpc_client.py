@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 RPC_METHODS = {
     "prompt": "autohand.prompt",
     "abort": "autohand.abort",
+    "reset": "autohand.reset",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -351,6 +352,10 @@ class RPCClient:
     async def abort(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Abort the current operation."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["abort"], params or {}))
+
+    async def reset(self) -> dict[str, Any]:
+        """Reset the conversation context and return the new session ID."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["reset"], {}))
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:
         """Respond to a permission request."""

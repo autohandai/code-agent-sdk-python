@@ -62,6 +62,8 @@ __all__ = [
     "GetMessagesParams",
     "GetMessagesResult",
     "PermissionResponseParams",
+    "ResetParams",
+    "ResetResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

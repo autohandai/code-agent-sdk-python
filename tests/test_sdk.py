@@ -13,6 +13,7 @@ from autohand_sdk.types import (
     GoalFeatureDisabledResult,
     GoalMutationResult,
     GoalSnapshot,
+    ResetResult,
     SDKConfig,
     UpdateGoalParams,
 )
@@ -278,6 +279,20 @@ class TestSDKMethods:
         ):
             result = await sdk.abort("User cancelled")
             assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_reset_uses_exact_wire_contract_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"sessionId": "session-new"},
+        ) as request:
+            result = await sdk.reset()
+
+        request.assert_awaited_once_with("autohand.reset", {})
+        assert result == ResetResult(session_id="session-new")
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:

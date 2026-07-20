@@ -138,6 +138,16 @@ async with AutohandSDK(cwd=".") as sdk:
         ...
 ```
 
+## Conversation reset
+
+```python
+reset = await sdk.reset()
+print(reset.session_id)
+```
+
+`reset()` calls `autohand.reset` with an empty parameter object and returns a
+typed `ResetResult`. The same method is available on `Agent`.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic
