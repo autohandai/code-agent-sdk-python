@@ -9,6 +9,7 @@ import pytest
 from autohand_sdk import AutohandSDK
 from autohand_sdk.types import (
     AutoresearchStartResult,
+    BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
     FeatureFlagSettings,
     GoalFeatureDisabledResult,
@@ -323,6 +324,30 @@ class TestSDKMethods:
         )
         assert result == BrowserHandoffCreateResult.model_validate(wire_result)
         assert result.workspace_root == "/workspace"
+
+    @pytest.mark.asyncio
+    async def test_attach_browser_handoff_uses_exact_wire_and_decodes_result(self) -> None:
+        sdk = AutohandSDK()
+        wire_result = {
+            "success": True,
+            "sessionId": "session-1",
+            "workspaceRoot": "/workspace",
+            "messageCount": 12,
+        }
+        with patch.object(
+            sdk._client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value=wire_result,
+        ) as request:
+            result = await sdk.attach_browser_handoff("token-1")
+
+        request.assert_awaited_once_with(
+            "autohand.browserHandoff.attach",
+            {"token": "token-1"},
+        )
+        assert result == BrowserHandoffAttachResult.model_validate(wire_result)
+        assert result.message_count == 12
 
     @pytest.mark.asyncio
     async def test_get_state_not_started(self) -> None:

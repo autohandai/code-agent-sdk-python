@@ -1381,6 +1381,21 @@ class BrowserHandoffCreateResult(RPCContractModel):
     url: str
 
 
+class BrowserHandoffAttachParams(RPCContractModel):
+    """Parameters for attaching a browser handoff."""
+
+    token: str = Field(..., min_length=1)
+
+
+class BrowserHandoffAttachResult(RPCContractModel):
+    """Result from attaching a browser handoff session."""
+
+    success: bool
+    session_id: str | None = None
+    workspace_root: str | None = None
+    message_count: int | None = None
+
+
 class PromptParams(BaseModel):
     """Parameters for the prompt method."""
 

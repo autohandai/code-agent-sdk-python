@@ -66,6 +66,8 @@ __all__ = [
     "ResetResult",
     "BrowserHandoffCreateParams",
     "BrowserHandoffCreateResult",
+    "BrowserHandoffAttachParams",
+    "BrowserHandoffAttachResult",
     # Persistent goal types
     "GoalStatus",
     "GoalState",

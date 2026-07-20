@@ -160,6 +160,16 @@ print(handoff.url)
 `extensionId` and `installUrl`; the typed result contains the token, session,
 workspace, creation and expiry timestamps, and launch URL.
 
+```python
+attached = await sdk.attach_browser_handoff(handoff.token)
+if attached.success:
+    print(attached.session_id, attached.message_count)
+```
+
+`attach_browser_handoff(token)` calls `autohand.browserHandoff.attach` with the
+required token and returns `BrowserHandoffAttachResult`. A missing, expired, or
+already-consumed token is represented by `success=False`.
+
 ## Skill registry and MCP discovery
 
 These methods use exact lower-camel-case CLI payloads and return Pydantic

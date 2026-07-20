@@ -25,6 +25,7 @@ RPC_METHODS = {
     "abort": "autohand.abort",
     "reset": "autohand.reset",
     "browser_handoff_create": "autohand.browserHandoff.create",
+    "browser_handoff_attach": "autohand.browserHandoff.attach",
     "permission_response": "autohand.permissionResponse",
     "get_state": "autohand.getState",
     "get_messages": "autohand.getMessages",
@@ -372,6 +373,13 @@ class RPCClient:
         return cast(
             dict[str, Any],
             await self._request(RPC_METHODS["browser_handoff_create"], params),
+        )
+
+    async def attach_browser_handoff(self, token: str) -> dict[str, Any]:
+        """Consume a browser handoff token and attach its session."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["browser_handoff_attach"], {"token": token}),
         )
 
     async def respond_to_permission(self, params: dict[str, Any]) -> dict[str, Any]:

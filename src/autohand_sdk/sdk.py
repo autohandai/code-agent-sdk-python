@@ -34,6 +34,8 @@ from autohand_sdk.types import (
     AutoresearchStatusResult,
     AutoresearchStopResult,
     AutoresearchSubagentOptions,
+    BrowserHandoffAttachParams,
+    BrowserHandoffAttachResult,
     BrowserHandoffCreateParams,
     BrowserHandoffCreateResult,
     CreateGoalParams,
@@ -289,6 +291,15 @@ class AutohandSDK:
             install_url=params.install_url,
         )
         return BrowserHandoffCreateResult.model_validate(result)
+
+    async def attach_browser_handoff(self, token: str) -> BrowserHandoffAttachResult:
+        """Consume a browser handoff token and attach its session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+
+        params = BrowserHandoffAttachParams(token=token)
+        result = await self._client.attach_browser_handoff(params.token)
+        return BrowserHandoffAttachResult.model_validate(result)
 
     async def respond_to_permission(
         self,

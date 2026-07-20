@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    BrowserHandoffAttachResult,
     BrowserHandoffCreateResult,
     GetSkillsRegistryResult,
     GoalMutationRPCResult,
@@ -59,6 +60,10 @@ class Agent:
     ) -> BrowserHandoffCreateResult:
         """Create a browser handoff for the active session."""
         return await self._sdk.create_browser_handoff(extension_id, install_url)
+
+    async def attach_browser_handoff(self, token: str) -> BrowserHandoffAttachResult:
+        """Consume a browser handoff token and attach its session."""
+        return await self._sdk.attach_browser_handoff(token)
 
     async def command(
         self,

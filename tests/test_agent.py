@@ -50,6 +50,16 @@ async def test_create_browser_handoff_delegates_to_sdk() -> None:
 
 
 @pytest.mark.asyncio
+async def test_attach_browser_handoff_delegates_to_sdk() -> None:
+    """Agent exposes browser handoff attachment."""
+    sdk = MagicMock(spec=AutohandSDK)
+    sdk.attach_browser_handoff = AsyncMock(return_value="attached")
+
+    assert await Agent.from_sdk(sdk).attach_browser_handoff("token-1") == "attached"
+    sdk.attach_browser_handoff.assert_awaited_once_with("token-1")
+
+
+@pytest.mark.asyncio
 async def test_command_and_capability_helpers_delegate() -> None:
     """Command execution and capability checks delegate to the SDK."""
     sdk = MagicMock(spec=AutohandSDK)
