@@ -102,10 +102,12 @@ from autohand_sdk.types import (
     SetContextCompactParams,
     SetContextCompactResult,
     SkillReference,
+    TypedSDKEvent,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
     YoloSetParams,
     YoloSetResult,
+    parse_sdk_event,
 )
 
 logger = logging.getLogger(__name__)
@@ -290,6 +292,13 @@ class AutohandSDK:
 
         async for event in self._client.prompt(params.model_dump(by_alias=True, exclude_none=True)):
             yield event
+
+    async def events(self) -> AsyncIterator[TypedSDKEvent | SDKEvent]:
+        """Stream typed CLI notifications with raw forward-compatible fallback."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        async for event in self._client.events():
+            yield parse_sdk_event(event)
 
     async def abort(self, reason: str | None = None) -> AbortResult:
         """Abort the current operation.

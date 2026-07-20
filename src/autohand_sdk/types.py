@@ -1158,6 +1158,28 @@ class AutoresearchPruneResult(AutoresearchModel):
 # =============================================================================
 
 
+class StrictSDKEventModel(BaseModel):
+    """Typed notification payload that rejects coercion at the CLI boundary."""
+
+    model_config = ConfigDict(
+        alias_generator=_snake_to_camel,
+        populate_by_name=True,
+        extra="allow",
+        strict=True,
+    )
+
+
+class AutomodeIterationEvent(StrictSDKEventModel):
+    """Progress emitted after one auto-mode iteration."""
+
+    type: Literal["automode_iteration"] = "automode_iteration"
+    session_id: str
+    iteration: int
+    actions: list[str]
+    tokens_used: int | None = None
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1289,7 +1311,8 @@ class AutoresearchOperationEvent(AutoresearchModel):
 
 
 TypedSDKEvent: TypeAlias = (
-    AgentStartEvent
+    AutomodeIterationEvent
+    | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
     | MessageEndEvent
@@ -1304,6 +1327,7 @@ TypedSDKEvent: TypeAlias = (
 SDKEvent: TypeAlias = dict[str, Any]
 
 EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
+    "automode_iteration": AutomodeIterationEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

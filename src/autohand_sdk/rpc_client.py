@@ -83,6 +83,7 @@ RPC_METHODS = {
 }
 
 NOTIFICATION_EVENT_TYPES = {
+    "autohand.automode.iteration": "automode_iteration",
     "autohand.agentStart": "agent_start",
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",

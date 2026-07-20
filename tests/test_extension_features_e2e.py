@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import Any, TypeVar
 import pytest
 from pydantic import ValidationError
 
-from autohand_sdk import AutohandSDK, SDKConfig
+from autohand_sdk import AutohandSDK, AutomodeIterationEvent, SDKConfig
 
 T = TypeVar("T")
 
@@ -68,6 +69,20 @@ async def _with_sdk(
 ) -> T:
     async with AutohandSDK(SDKConfig(cli_path=str(cli_path), timeout=10_000)) as sdk:
         return await run(sdk)
+
+
+async def _next_sdk_event(sdk: AutohandSDK) -> Any:
+    """Return one public event without leaving its subscriber open."""
+    events = sdk.events()
+    next_event = asyncio.create_task(anext(events))
+    try:
+        await asyncio.sleep(0)
+        await sdk.get_state()
+        return await asyncio.wait_for(next_event, timeout=2)
+    finally:
+        if not next_event.done():
+            next_event.cancel()
+        await events.aclose()
 
 
 @pytest.mark.asyncio
@@ -636,3 +651,54 @@ async def test_context_compaction_control_rejects_malformed_result(tmp_path: Pat
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.set_context_compact(False))
+
+
+@pytest.mark.asyncio
+async def test_automode_iteration_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types auto-mode iteration notifications."""
+    notification = {
+        "method": "autohand.automode.iteration",
+        "params": {
+            "sessionId": "automode-1",
+            "iteration": 3,
+            "actions": ["edited sdk.py", "ran tests"],
+            "tokensUsed": 1250,
+            "timestamp": "2026-07-20T00:03:00.000Z",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path,
+        method="unused",
+        params={},
+        result={},
+        notifications=[notification],
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, AutomodeIterationEvent)
+    assert event.iteration == 3
+    assert event.tokens_used == 1250
+
+
+@pytest.mark.asyncio
+async def test_automode_iteration_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed known events remain available as raw forward-compatible data."""
+    malformed = {
+        "method": "autohand.automode.iteration",
+        "params": {
+            "sessionId": "automode-1",
+            "iteration": "three",
+            "actions": [],
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path,
+        method="unused",
+        params={},
+        result={},
+        notifications=[malformed],
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["type"] == "automode_iteration"
+    assert event["iteration"] == "three"
