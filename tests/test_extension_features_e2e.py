@@ -20,6 +20,7 @@ from autohand_sdk import (
     HookPostToolEvent,
     HookPrePromptEvent,
     HookPreToolEvent,
+    McpInvokeRequestEvent,
     SDKConfig,
 )
 
@@ -931,3 +932,43 @@ async def test_post_response_hook_event_preserves_malformed_fallback(tmp_path: P
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["tokens_usage_status"] == "estimated"
+
+
+@pytest.mark.asyncio
+async def test_mcp_invocation_request_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types MCP invocation requests."""
+    notification = {
+        "method": "autohand.mcp.invokeRequest",
+        "params": {
+            "requestId": "mcp-1",
+            "toolName": "vscode.findReferences",
+            "args": {"symbol": "Agent"},
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, McpInvokeRequestEvent)
+    assert event.request_id == "mcp-1"
+
+
+@pytest.mark.asyncio
+async def test_mcp_invocation_request_event_preserves_malformed_fallback(
+    tmp_path: Path,
+) -> None:
+    """Malformed MCP invocation requests remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.mcp.invokeRequest",
+        "params": {
+            "requestId": "mcp-1",
+            "toolName": "tool",
+            "args": [],
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["args"] == []

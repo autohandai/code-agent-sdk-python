@@ -1242,6 +1242,16 @@ class HookPostResponseEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class McpInvokeRequestEvent(StrictSDKEventModel):
+    """Request for the host to invoke a VS Code MCP tool."""
+
+    type: Literal["mcp_invoke_request"] = "mcp_invoke_request"
+    request_id: str
+    tool_name: str
+    args: dict[str, Any]
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1380,6 +1390,7 @@ TypedSDKEvent: TypeAlias = (
     | HookPostToolEvent
     | HookPrePromptEvent
     | HookPostResponseEvent
+    | McpInvokeRequestEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1402,6 +1413,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "hook_post_tool": HookPostToolEvent,
     "hook_pre_prompt": HookPrePromptEvent,
     "hook_post_response": HookPostResponseEvent,
+    "mcp_invoke_request": McpInvokeRequestEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,
