@@ -1200,6 +1200,16 @@ class AutomodeErrorEvent(StrictSDKEventModel):
     timestamp: str
 
 
+class HookPreToolEvent(StrictSDKEventModel):
+    """Hook notification emitted before a tool invocation."""
+
+    type: Literal["hook_pre_tool"] = "hook_pre_tool"
+    tool_id: str
+    tool_name: str
+    args: dict[str, Any]
+    timestamp: str
+
+
 class AgentStartEvent(BaseModel):
     """Event emitted when the agent starts."""
 
@@ -1334,6 +1344,7 @@ TypedSDKEvent: TypeAlias = (
     AutomodeIterationEvent
     | AutomodeCompleteEvent
     | AutomodeErrorEvent
+    | HookPreToolEvent
     | AgentStartEvent
     | AgentEndEvent
     | MessageUpdateEvent
@@ -1352,6 +1363,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "automode_iteration": AutomodeIterationEvent,
     "automode_complete": AutomodeCompleteEvent,
     "automode_error": AutomodeErrorEvent,
+    "hook_pre_tool": HookPreToolEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
     "message_update": MessageUpdateEvent,

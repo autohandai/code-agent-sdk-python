@@ -16,6 +16,7 @@ from autohand_sdk import (
     AutomodeCompleteEvent,
     AutomodeErrorEvent,
     AutomodeIterationEvent,
+    HookPreToolEvent,
     SDKConfig,
 )
 
@@ -776,3 +777,41 @@ async def test_automode_error_event_preserves_malformed_fallback(tmp_path: Path)
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
     assert event["error"] == {"message": "bad"}
+
+
+@pytest.mark.asyncio
+async def test_pre_tool_hook_event_uses_spawned_cli(tmp_path: Path) -> None:
+    """The public event stream types pre-tool hook notifications."""
+    notification = {
+        "method": "autohand.hook.preTool",
+        "params": {
+            "toolId": "tool-1",
+            "toolName": "write_file",
+            "args": {"path": "a.py"},
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, HookPreToolEvent)
+    assert event.args == {"path": "a.py"}
+
+
+@pytest.mark.asyncio
+async def test_pre_tool_hook_event_preserves_malformed_fallback(tmp_path: Path) -> None:
+    """Malformed pre-tool hooks remain available as raw notifications."""
+    malformed = {
+        "method": "autohand.hook.preTool",
+        "params": {
+            "toolId": "tool-1",
+            "toolName": "write_file",
+            "args": "a.py",
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
+    event = await _with_sdk(cli, _next_sdk_event)
+    assert isinstance(event, dict)
+    assert event["args"] == "a.py"
