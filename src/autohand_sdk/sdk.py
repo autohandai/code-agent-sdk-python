@@ -77,6 +77,8 @@ from autohand_sdk.types import (
     GoalTemplatesResult,
     InstallSkillResult,
     McpGetServerConfigsResult,
+    McpInvokeResponseParams,
+    McpInvokeResponseResult,
     McpListServersResult,
     McpListToolsResult,
     McpSetVscodeToolsParams,
@@ -563,6 +565,28 @@ class AutohandSDK:
             params.model_dump(by_alias=True, exclude_none=True)
         )
         return McpSetVscodeToolsResult.model_validate(result)
+
+    async def respond_to_mcp_invocation(
+        self,
+        request_id: str,
+        *,
+        success: bool,
+        result: str | None = None,
+        error: str | None = None,
+    ) -> McpInvokeResponseResult:
+        """Resolve a VS Code-hosted MCP invocation."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        params = McpInvokeResponseParams(
+            request_id=request_id,
+            success=success,
+            result=result,
+            error=error,
+        )
+        response = await self._client.respond_to_mcp_invocation(
+            params.model_dump(by_alias=True, exclude_none=True)
+        )
+        return McpInvokeResponseResult.model_validate(response)
 
     async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.

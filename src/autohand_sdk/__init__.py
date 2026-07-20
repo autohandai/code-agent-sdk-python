@@ -89,6 +89,8 @@ __all__ = [
     "VscodeMcpToolDescriptor",
     "McpSetVscodeToolsParams",
     "McpSetVscodeToolsResult",
+    "McpInvokeResponseParams",
+    "McpInvokeResponseResult",
     "ResetParams",
     "ResetResult",
     "BrowserHandoffCreateParams",

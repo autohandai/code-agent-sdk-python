@@ -27,6 +27,7 @@ from autohand_sdk.types import (
     GoalTemplatesResult,
     InstallSkillResult,
     McpGetServerConfigsResult,
+    McpInvokeResponseResult,
     McpListServersResult,
     McpListToolsResult,
     McpSetVscodeToolsResult,
@@ -134,6 +135,22 @@ class Agent:
     ) -> McpSetVscodeToolsResult:
         """Replace the CLI's VS Code-hosted MCP tool descriptors."""
         return await self._sdk.set_vscode_mcp_tools(tools)
+
+    async def respond_to_mcp_invocation(
+        self,
+        request_id: str,
+        *,
+        success: bool,
+        result: str | None = None,
+        error: str | None = None,
+    ) -> McpInvokeResponseResult:
+        """Resolve a VS Code-hosted MCP invocation."""
+        return await self._sdk.respond_to_mcp_invocation(
+            request_id,
+            success=success,
+            result=result,
+            error=error,
+        )
 
     async def create_browser_handoff(
         self,

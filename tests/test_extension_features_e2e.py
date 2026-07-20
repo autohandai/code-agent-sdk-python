@@ -421,3 +421,35 @@ async def test_vscode_mcp_tool_registration_rejects_malformed_result(tmp_path: P
     )
     with pytest.raises(ValidationError):
         await _with_sdk(cli, lambda sdk: sdk.set_vscode_mcp_tools([]))
+
+
+@pytest.mark.asyncio
+async def test_mcp_invocation_response_uses_spawned_cli(tmp_path: Path) -> None:
+    """The SDK resolves a VS Code-hosted MCP invocation through the CLI."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.mcp.invokeResponse",
+        params={"requestId": "mcp-1", "success": True, "result": '{"matches":3}'},
+        result={"success": True},
+    )
+    result = await _with_sdk(
+        cli,
+        lambda sdk: sdk.respond_to_mcp_invocation("mcp-1", success=True, result='{"matches":3}'),
+    )
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_mcp_invocation_response_rejects_malformed_ack(tmp_path: Path) -> None:
+    """Malformed MCP response acknowledgements fail validation."""
+    cli = _feature_cli(
+        tmp_path,
+        method="autohand.mcp.invokeResponse",
+        params={"requestId": "mcp-1", "success": False, "error": "failed"},
+        result={"success": "true"},
+    )
+    with pytest.raises(ValidationError):
+        await _with_sdk(
+            cli,
+            lambda sdk: sdk.respond_to_mcp_invocation("mcp-1", success=False, error="failed"),
+        )

@@ -1565,6 +1565,21 @@ class McpSetVscodeToolsResult(StrictRPCContractModel):
     success: bool
 
 
+class McpInvokeResponseParams(StrictRPCContractModel):
+    """Resolution of one VS Code-hosted MCP invocation."""
+
+    request_id: str = Field(..., min_length=1)
+    success: bool
+    result: str | None = None
+    error: str | None = None
+
+
+class McpInvokeResponseResult(StrictRPCContractModel):
+    """Acknowledgement after resolving an MCP invocation."""
+
+    success: bool
+
+
 class ResetParams(RPCContractModel):
     """Parameters for resetting the conversation context."""
 
