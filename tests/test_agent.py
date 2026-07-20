@@ -1,4 +1,5 @@
 """Tests for the high-level Agent facade."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch

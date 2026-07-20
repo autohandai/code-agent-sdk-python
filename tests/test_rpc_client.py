@@ -1,4 +1,5 @@
 """Tests for the RPC client."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,7 +38,9 @@ class TestRPCClientInitialization:
         assert client._transport.options.skill_files == ["./skills/custom/SKILL.md"]
 
     def test_init_processes_skill_names(self) -> None:
-        config = SDKConfig(skill_refs=["typescript", { "name": "my-skill", "path": "./skills/SKILL.md" }])
+        config = SDKConfig(
+            skill_refs=["typescript", {"name": "my-skill", "path": "./skills/SKILL.md"}]
+        )
         client = RPCClient(config)
         # Names are extracted
         assert "typescript" in client._transport.options.skills
@@ -155,9 +158,7 @@ class TestRPCClientInitialization:
         assert opts.agents_md_auto_update is True
 
     def test_init_with_env_vars(self) -> None:
-        config = SDKConfig(
-            env_vars={"AUTOHAND_DEBUG": "1", "AUTOHAND_YES": "1"}
-        )
+        config = SDKConfig(env_vars={"AUTOHAND_DEBUG": "1", "AUTOHAND_YES": "1"})
         client = RPCClient(config)
         assert client._transport.options.env_vars == {
             "AUTOHAND_DEBUG": "1",
@@ -171,7 +172,11 @@ class TestRPCClientLifecycle:
     @pytest.mark.asyncio
     async def test_start_not_started(self) -> None:
         client = RPCClient()
-        with patch.object(client._transport, "start", new_callable=AsyncMock) as mock_start:
+        client._transport.is_running = MagicMock(return_value=True)
+        with (
+            patch.object(client._transport, "start", new_callable=AsyncMock) as mock_start,
+            patch.object(client, "_request", new_callable=AsyncMock, return_value={}),
+        ):
             await client.start()
             mock_start.assert_called_once()
             assert client._started
@@ -180,8 +185,12 @@ class TestRPCClientLifecycle:
     async def test_start_runs_startup_check_when_transport_running(self) -> None:
         client = RPCClient()
         client._transport.is_running = MagicMock(return_value=True)
-        with patch.object(client._transport, "start", new_callable=AsyncMock), \
-             patch.object(client, "_request", new_callable=AsyncMock, return_value={"status": "idle"}) as mock_request:
+        with (
+            patch.object(client._transport, "start", new_callable=AsyncMock),
+            patch.object(
+                client, "_request", new_callable=AsyncMock, return_value={"status": "idle"}
+            ) as mock_request,
+        ):
             await client.start()
 
         mock_request.assert_called_once_with(RPC_METHODS["get_state"], {})
@@ -212,8 +221,10 @@ class TestRPCClientLifecycle:
     async def test_start_skips_startup_check_when_disabled(self) -> None:
         client = RPCClient(SDKConfig(startup_check=False))
         client._transport.is_running = MagicMock(return_value=True)
-        with patch.object(client._transport, "start", new_callable=AsyncMock), \
-             patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+        with (
+            patch.object(client._transport, "start", new_callable=AsyncMock),
+            patch.object(client, "_request", new_callable=AsyncMock) as mock_request,
+        ):
             await client.start()
 
         mock_request.assert_not_called()
@@ -223,6 +234,7 @@ class TestRPCClientLifecycle:
     async def test_start_already_started(self) -> None:
         client = RPCClient()
         client._started = True
+        client._transport.is_running = MagicMock(return_value=True)
         with patch.object(client._transport, "start", new_callable=AsyncMock) as mock_start:
             await client.start()
             mock_start.assert_not_called()
@@ -249,14 +261,18 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_initialize(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.initialize({"model": "fantail"})
             assert result["success"]
 
     @pytest.mark.asyncio
     async def test_abort(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.abort()
             assert result["success"]
 
@@ -270,32 +286,43 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_respond_to_permission(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.respond_to_permission({"request_id": "123", "decision": "allow"})
             assert result["success"]
 
     @pytest.mark.asyncio
     async def test_get_state(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={
-            "status": "idle",
-            "model": "fantail",
-            "workspace": "/test",
-        }):
+        with patch.object(
+            client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={
+                "status": "idle",
+                "model": "fantail",
+                "workspace": "/test",
+            },
+        ):
             result = await client.get_state()
             assert result["status"] == "idle"
 
     @pytest.mark.asyncio
     async def test_get_messages(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"messages": []}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"messages": []}
+        ):
             result = await client.get_messages()
             assert result == {"messages": []}
 
     @pytest.mark.asyncio
     async def test_get_models(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"models": [{"id": "fantail"}]}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"models": [{"id": "fantail"}]}
+        ):
             result = await client.get_models()
             assert result == {"models": [{"id": "fantail"}]}
 
@@ -309,35 +336,45 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_set_model(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.set_model("fantail")
             assert result["success"]
 
     @pytest.mark.asyncio
     async def test_set_agent(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.set_agent("code-reviewer")
             assert result["success"]
 
     @pytest.mark.asyncio
     async def test_set_temperature(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.set_temperature(0.5)
             assert result["success"]
 
     @pytest.mark.asyncio
     async def test_get_account_info(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"email": "test@example.com"}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"email": "test@example.com"}
+        ):
             result = await client.get_account_info()
             assert result["email"] == "test@example.com"
 
     @pytest.mark.asyncio
     async def test_save_session(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await client.save_session()
             assert result["success"]
 
@@ -388,13 +425,20 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_autoresearch_lifecycle_rpc_methods(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}) as request:
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ) as request:
             await client.start_autoresearch({"objective": "Improve latency", "maxIterations": 5})
             await client.get_autoresearch_status()
             await client.stop_autoresearch()
 
         assert request.await_args_list == [
-            (("autohand.autoresearch.start", {"objective": "Improve latency", "maxIterations": 5}),),
+            (
+                (
+                    "autohand.autoresearch.start",
+                    {"objective": "Improve latency", "maxIterations": 5},
+                ),
+            ),
             (("autohand.autoresearch.status", {}),),
             (("autohand.autoresearch.stop", {}),),
         ]
@@ -402,20 +446,34 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_autoresearch_ledger_rpc_methods(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"success": True}) as request:
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"success": True}
+        ) as request:
             await client.get_autoresearch_history()
             await client.replay_autoresearch({"attemptId": "attempt-1", "evaluator": "original"})
             await client.rescore_autoresearch({"attemptId": "attempt-1"})
-            await client.compare_autoresearch({"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"})
+            await client.compare_autoresearch(
+                {"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"}
+            )
             await client.get_autoresearch_pareto()
             await client.pin_autoresearch({"attemptId": "attempt-1", "pinned": True})
             await client.prune_autoresearch({"dryRun": False, "yes": True})
 
         assert request.await_args_list == [
             (("autohand.autoresearch.history", {}),),
-            (("autohand.autoresearch.replay", {"attemptId": "attempt-1", "evaluator": "original"}),),
+            (
+                (
+                    "autohand.autoresearch.replay",
+                    {"attemptId": "attempt-1", "evaluator": "original"},
+                ),
+            ),
             (("autohand.autoresearch.rescore", {"attemptId": "attempt-1"}),),
-            (("autohand.autoresearch.compare", {"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"}),),
+            (
+                (
+                    "autohand.autoresearch.compare",
+                    {"leftAttemptId": "attempt-1", "rightAttemptId": "attempt-2"},
+                ),
+            ),
             (("autohand.autoresearch.pareto", {}),),
             (("autohand.autoresearch.pin", {"attemptId": "attempt-1", "pinned": True}),),
             (("autohand.autoresearch.prune", {"dryRun": False, "yes": True}),),
@@ -431,7 +489,12 @@ class TestRPCClientMethods:
     @pytest.mark.asyncio
     async def test_prompt(self) -> None:
         client = RPCClient()
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"content": "Hello", "session_id": "123"}):
+        with patch.object(
+            client,
+            "_request",
+            new_callable=AsyncMock,
+            return_value={"content": "Hello", "session_id": "123"},
+        ):
             events = []
             async for event in client.prompt({"message": "Hi"}):
                 events.append(event)
@@ -445,7 +508,9 @@ class TestRPCClientMethods:
         client = RPCClient()
         client._event_queue.put_nowait({"type": "message_update", "delta": "stale"})
 
-        with patch.object(client, "_request", new_callable=AsyncMock, return_value={"content": "fresh"}):
+        with patch.object(
+            client, "_request", new_callable=AsyncMock, return_value={"content": "fresh"}
+        ):
             events = [event async for event in client.prompt({"message": "Hi"})]
 
         assert all(event.get("delta") != "stale" for event in events)
@@ -460,9 +525,16 @@ class TestRPCClientMethods:
         cli_path = tmp_path / "stream-cli.py"
         cli_path.write_text(
             "#!/usr/bin/env python3\n"
-            "import json, sys\n"
+            "import json, sys, time\n"
             "for line in sys.stdin:\n"
             "    req = json.loads(line)\n"
+            "    if req.get('method') == 'autohand.getState':\n"
+            "        print(json.dumps({'jsonrpc': '2.0', 'id': req.get('id'), "
+            "'result': {'status': 'idle'}}), flush=True)\n"
+            "        continue\n"
+            "    print(json.dumps({'jsonrpc': '2.0', 'id': req.get('id'), "
+            "'result': {'success': True}}), flush=True)\n"
+            "    time.sleep(0.03)\n"
             "    print(json.dumps({'jsonrpc': '2.0', 'method': 'autohand.agentStart', 'params': {\n"
             "        'sessionId': 's1', 'model': 'fantail', 'workspace': '.', 'timestamp': 't1'\n"
             "    }}), flush=True)\n"
@@ -474,8 +546,7 @@ class TestRPCClientMethods:
             "    }}), flush=True)\n"
             "    print(json.dumps({'jsonrpc': '2.0', 'method': 'autohand.turnEnd', 'params': {\n"
             "        'turnId': 'turn1', 'timestamp': 't4'\n"
-            "    }}), flush=True)\n"
-            "    print(json.dumps({'jsonrpc': '2.0', 'id': req.get('id'), 'result': {'success': True}}), flush=True)\n",
+            "    }}), flush=True)\n",
             encoding="utf-8",
         )
         cli_path.chmod(0o755)

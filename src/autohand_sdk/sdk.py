@@ -1,10 +1,14 @@
 """Main SDK class for the Autohand Python SDK."""
+
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from typing import Any, Literal, cast
 
+from autohand_sdk.errors import TransportError
 from autohand_sdk.rpc_client import RPCClient
 from autohand_sdk.types import (
     AbortParams,
@@ -34,6 +38,7 @@ from autohand_sdk.types import (
     FeatureFlagSettings,
     GetMessagesParams,
     GetMessagesResult,
+    GetSkillsRegistryResult,
     GetStateParams,
     GetStateResult,
     GoalFeatureDisabledResult,
@@ -43,6 +48,10 @@ from autohand_sdk.types import (
     GoalSnapshotResult,
     GoalTemplateMetadata,
     GoalTemplatesResult,
+    InstallSkillResult,
+    McpGetServerConfigsResult,
+    McpListServersResult,
+    McpListToolsResult,
     PermissionResponseParams,
     PromptParams,
     PromptResult,
@@ -77,6 +86,8 @@ class AutohandSDK:
         self._config = config
         self._client: RPCClient | None = None
         self._started = False
+        self._starting = False
+        self._lifecycle_lock = asyncio.Lock()
 
         # Initialize skills from config
         self._skills: list[SkillReference] = []
@@ -86,7 +97,10 @@ class AutohandSDK:
             self._skills = config.skills.skills.copy()
 
         # Initialize client
-        self._client = RPCClient(self._config)
+        self._client = RPCClient(
+            self._config,
+            termination_callback=self._handle_client_termination,
+        )
 
     @property
     def config(self) -> SDKConfig:
@@ -107,48 +121,90 @@ class AutohandSDK:
         Args:
             skills: List of skill references.
         """
+        if (
+            self._starting
+            or self._started
+            or (self._client is not None and self._client.is_running())
+        ):
+            raise RuntimeError(
+                "skills must be configured before start(); stop the SDK before changing skills"
+            )
+
         self._skills = skills.copy()
         # Update config for consistency
         self._config = self._config.model_copy(update={"skill_refs": self._skills})
         # Recreate client with new config
-        self._client = RPCClient(self._config)
+        self._client = RPCClient(
+            self._config,
+            termination_callback=self._handle_client_termination,
+        )
 
     async def start(self) -> None:
         """Start the SDK.
 
         Initializes the RPC client and connects to the CLI subprocess.
         """
-        if self._started:
+        async with self._lifecycle_lock:
+            await self._start_locked()
+
+    async def _start_locked(self) -> None:
+        """Start once while the SDK lifecycle lock is held."""
+        if self._started and self._client is not None and self._client.is_running():
             return
+        self._starting = True
+        client = self._client
+        try:
+            self._started = False
 
-        if not self._client:
-            raise RuntimeError("RPC client not initialized")
+            if client is None:
+                raise RuntimeError("RPC client not initialized")
 
-        # Rebuild client if skills changed
-        if self._config.skill_refs != self._skills:
-            self._config = self._config.model_copy(update={"skill_refs": self._skills})
-            self._client = RPCClient(self._config)
-
-        await self._client.start()
-        if self._config.features is not None:
-            await self._client.apply_flag_settings(
-                {
-                    "features": self._config.features.model_dump(
-                        by_alias=True,
-                        exclude_none=True,
+            # Rebuild client if skills changed
+            if (self._config.skill_refs or []) != self._skills:
+                if client.is_running():
+                    raise RuntimeError(
+                        "cannot rebuild the RPC client while its CLI transport is running"
                     )
-                }
-            )
-        self._started = True
+                self._config = self._config.model_copy(update={"skill_refs": self._skills})
+                client = RPCClient(
+                    self._config,
+                    termination_callback=self._handle_client_termination,
+                )
+                self._client = client
+
+            await client.start()
+            if self._config.plan_mode is not None:
+                await client.set_plan_mode(self._config.plan_mode)
+            if self._config.features is not None:
+                await client.apply_flag_settings(
+                    {
+                        "features": self._config.features.model_dump(
+                            by_alias=True,
+                            exclude_none=True,
+                        )
+                    }
+                )
+            if not client._started or not client.is_running():
+                raise TransportError("CLI transport stopped during post-start configuration")
+            self._started = True
+        except BaseException:
+            self._started = False
+            if client is not None:
+                with suppress(Exception):
+                    await client.stop()
+            raise
+        finally:
+            self._starting = False
 
     async def stop(self) -> None:
         """Stop the SDK.
 
         Terminates the CLI subprocess and cleans up resources.
         """
-        if self._client:
-            await self._client.stop()
-        self._started = False
+        async with self._lifecycle_lock:
+            if self._client:
+                await self._client.stop()
+            self._started = False
 
     async def close(self) -> None:
         """Alias for stop()."""
@@ -162,6 +218,10 @@ class AutohandSDK:
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Async context manager exit."""
         await self.stop()
+
+    def _handle_client_termination(self, _error: BaseException) -> None:
+        """Synchronize public SDK state with an unexpected CLI termination."""
+        self._started = False
 
     def stream_prompt(self, message: str, **kwargs: Any) -> AsyncIterator[SDKEvent]:
         """Stream a prompt to the agent.
@@ -234,9 +294,7 @@ class AutohandSDK:
             params.model_dump(by_alias=True, exclude_none=True)
         )
 
-    async def get_state(
-        self, include_context: bool | None = None
-    ) -> GetStateResult:
+    async def get_state(self, include_context: bool | None = None) -> GetStateResult:
         """Get the current agent state.
 
         Args:
@@ -297,6 +355,51 @@ class AutohandSDK:
         result = await self._client.get_agents()
         agents = result.get("agents", result.get("commands", []))
         return cast(list[dict[str, Any]], agents)
+
+    async def get_skills_registry(
+        self,
+        force_refresh: bool | None = None,
+    ) -> GetSkillsRegistryResult:
+        """Return the typed community skill registry."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return GetSkillsRegistryResult.model_validate(
+            await self._client.get_skills_registry(force_refresh)
+        )
+
+    async def install_skill(
+        self,
+        skill_name: str,
+        scope: Literal["user", "project"],
+        force: bool | None = None,
+    ) -> InstallSkillResult:
+        """Install one community skill in user or project scope."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return InstallSkillResult.model_validate(
+            await self._client.install_skill(skill_name, scope, force)
+        )
+
+    async def list_mcp_servers(self) -> McpListServersResult:
+        """List known MCP servers and their connection status."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return McpListServersResult.model_validate(await self._client.list_mcp_servers())
+
+    async def list_mcp_tools(
+        self,
+        server_name: str | None = None,
+    ) -> McpListToolsResult:
+        """List MCP tools, optionally filtering by server name."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return McpListToolsResult.model_validate(await self._client.list_mcp_tools(server_name))
+
+    async def get_mcp_server_configs(self) -> McpGetServerConfigsResult:
+        """Return the CLI's typed MCP server configurations."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return McpGetServerConfigsResult.model_validate(await self._client.get_mcp_server_configs())
 
     async def supported_commands(self) -> list[str]:
         """Return CLI slash commands normalized with a leading slash."""
@@ -369,6 +472,14 @@ class AutohandSDK:
         self._config = self._config.model_copy(update={"model": model})
 
         return await self._client.set_model(model)
+
+    async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
+        """Enable or disable plan mode for the live CLI session."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        result = await self._client.set_plan_mode(enabled)
+        self._config = self._config.model_copy(update={"plan_mode": enabled})
+        return result
 
     async def set_agent(self, agent: str) -> dict[str, Any]:
         """Set the agent.
@@ -466,7 +577,9 @@ class AutohandSDK:
             min_tokens_before_wrap_up=min_tokens_before_wrap_up,
             min_time_seconds_before_wrap_up=min_time_seconds_before_wrap_up,
         )
-        return await self._goal_mutation("create_goal", params.model_dump(by_alias=True, exclude_none=True))
+        return await self._goal_mutation(
+            "create_goal", params.model_dump(by_alias=True, exclude_none=True)
+        )
 
     async def update_goal(self, params: UpdateGoalParams) -> GoalMutationRPCResult:
         """Update fields on the active persistent goal."""
@@ -496,7 +609,9 @@ class AutohandSDK:
             min_tokens_before_wrap_up=min_tokens_before_wrap_up,
             min_time_seconds_before_wrap_up=min_time_seconds_before_wrap_up,
         )
-        return await self._goal_mutation("queue_goal", params.model_dump(by_alias=True, exclude_none=True))
+        return await self._goal_mutation(
+            "queue_goal", params.model_dump(by_alias=True, exclude_none=True)
+        )
 
     async def start_queued_goal(self) -> GoalMutationRPCResult:
         """Start the next queued persistent goal."""
@@ -595,9 +710,7 @@ class AutohandSDK:
         """Read active autoresearch state, progress, attempts, and Pareto IDs."""
         if not self._client:
             raise RuntimeError("SDK not started")
-        return AutoresearchStatusResult.model_validate(
-            await self._client.get_autoresearch_status()
-        )
+        return AutoresearchStatusResult.model_validate(await self._client.get_autoresearch_status())
 
     async def stop_autoresearch(self) -> AutoresearchStopResult:
         """Pause autoresearch without deleting its persisted state."""
@@ -663,9 +776,7 @@ class AutohandSDK:
         """List constraint-passing non-dominated attempts."""
         if not self._client:
             raise RuntimeError("SDK not started")
-        return AutoresearchParetoResult.model_validate(
-            await self._client.get_autoresearch_pareto()
-        )
+        return AutoresearchParetoResult.model_validate(await self._client.get_autoresearch_pareto())
 
     async def pin_autoresearch(self, attempt_id: str, pinned: bool) -> AutoresearchPinResult:
         """Protect or release an attempt's artifacts from pruning."""

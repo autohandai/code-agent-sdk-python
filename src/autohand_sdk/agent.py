@@ -1,13 +1,19 @@
 """High-level agent facade for command runs and persistent goals."""
+
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
+    GetSkillsRegistryResult,
     GoalMutationRPCResult,
     GoalSnapshotResult,
     GoalTemplatesResult,
+    InstallSkillResult,
+    McpGetServerConfigsResult,
+    McpListServersResult,
+    McpListToolsResult,
     PromptResult,
     SDKConfig,
     UpdateGoalParams,
@@ -64,6 +70,41 @@ class Agent:
     async def supports_command(self, command: str) -> bool:
         """Return whether the current CLI supports a slash command."""
         return await self._sdk.supports_command(command)
+
+    async def get_skills_registry(
+        self,
+        force_refresh: bool | None = None,
+    ) -> GetSkillsRegistryResult:
+        """Return the community skill registry."""
+        return await self._sdk.get_skills_registry(force_refresh)
+
+    async def install_skill(
+        self,
+        skill_name: str,
+        scope: Literal["user", "project"],
+        force: bool | None = None,
+    ) -> InstallSkillResult:
+        """Install one community skill."""
+        return await self._sdk.install_skill(skill_name, scope, force)
+
+    async def list_mcp_servers(self) -> McpListServersResult:
+        """List known MCP servers."""
+        return await self._sdk.list_mcp_servers()
+
+    async def list_mcp_tools(
+        self,
+        server_name: str | None = None,
+    ) -> McpListToolsResult:
+        """List MCP tools, optionally filtered by server."""
+        return await self._sdk.list_mcp_tools(server_name)
+
+    async def get_mcp_server_configs(self) -> McpGetServerConfigsResult:
+        """Return MCP server configurations."""
+        return await self._sdk.get_mcp_server_configs()
+
+    async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
+        """Enable or disable plan mode."""
+        return await self._sdk.set_plan_mode(enabled)
 
     async def get_goal(self) -> GoalSnapshotResult:
         """Get the persistent-goal snapshot."""

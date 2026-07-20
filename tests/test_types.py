@@ -1,4 +1,5 @@
 """Tests for SDK types."""
+
 from __future__ import annotations
 
 import pytest
@@ -198,9 +199,7 @@ class TestSDKEvents:
     """Tests for event parsing helpers."""
 
     def test_parse_known_event(self) -> None:
-        event = parse_sdk_event(
-            {"type": "message_update", "messageId": "m1", "delta": "hello"}
-        )
+        event = parse_sdk_event({"type": "message_update", "messageId": "m1", "delta": "hello"})
         assert not isinstance(event, dict)
         assert event.type == "message_update"
         assert event.message_id == "m1"

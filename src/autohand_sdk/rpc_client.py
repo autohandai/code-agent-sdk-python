@@ -1,11 +1,12 @@
 """JSON-RPC client for communicating with the Autohand CLI subprocess."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import suppress
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from autohand_sdk.errors import TransportError
 from autohand_sdk.transport import Transport, TransportOptions
@@ -27,9 +28,15 @@ RPC_METHODS = {
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
     "get_supported_commands": "autohand.getSupportedCommands",
+    "get_skills_registry": "autohand.getSkillsRegistry",
+    "install_skill": "autohand.installSkill",
     "set_model": "autohand.modelSet",
+    "set_plan_mode": "autohand.planModeSet",
     "apply_flag_settings": "autohand.applyFlagSettings",
     "get_account_info": "autohand.getAccountInfo",
+    "mcp_list_servers": "autohand.mcp.listServers",
+    "mcp_list_tools": "autohand.mcp.listTools",
+    "mcp_get_server_configs": "autohand.mcp.getServerConfigs",
     "goal_get": "autohand.goal.get",
     "goal_create": "autohand.goal.create",
     "goal_update": "autohand.goal.update",
@@ -103,16 +110,34 @@ CAMEL_TO_SNAKE_KEYS = {
     "driftWarnings": "drift_warnings",
 }
 
+EVENT_BACKLOG_LIMIT = 1_024
+EventQueue = asyncio.Queue[dict[str, Any] | None]
+ClientTerminationCallback = Callable[[BaseException], None]
+PROMPT_CLEANUP_TIMEOUT_SECONDS = 2.0
+
 
 class RPCClient:
     """High-level JSON-RPC client for the Autohand CLI."""
 
-    def __init__(self, config: SDKConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: SDKConfig | None = None,
+        *,
+        termination_callback: ClientTerminationCallback | None = None,
+    ) -> None:
         self.config = config if config is not None else SDKConfig.model_validate({})
         self._transport: Transport | None = None
         self._started = False
-        self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # ``_event_queue`` remains as a compatibility/debug backlog. Live
+        # consumers use dedicated queues so they cannot steal each other's
+        # notifications.
+        self._event_queue: EventQueue = asyncio.Queue(maxsize=EVENT_BACKLOG_LIMIT)
+        self._event_subscribers: set[EventQueue] = set()
+        self._event_streams_closed = False
+        self._prompt_event_queue: EventQueue | None = None
         self._prompt_lock = asyncio.Lock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._termination_callback = termination_callback
 
         if self.config.provider is not None:
             validate_provider_config(self.config.provider, self.config)
@@ -120,31 +145,44 @@ class RPCClient:
         opts = self._build_transport_options()
         self._transport = Transport(opts)
         self._transport.on_notification("*", self._handle_notification)
+        self._transport.on_termination(self._handle_termination)
 
     async def start(self) -> None:
         """Start the RPC client."""
-        if self._started:
-            return
-        if not self._transport:
-            raise RuntimeError("Transport not initialized")
-        await self._transport.start()
-        if self.config.startup_check and self._transport.is_running():
-            try:
-                await self._request(RPC_METHODS["get_state"], {})
-            except Exception as exc:
-                stderr = self._transport.stderr_tail
-                await self._transport.stop()
-                detail = f"\nCLI stderr:\n{stderr}" if stderr else ""
-                raise TransportError(f"CLI startup check failed: {exc}{detail}") from exc
-            finally:
-                self._drain_event_queue()
-        self._started = True
+        async with self._lifecycle_lock:
+            if self._started and self.is_running():
+                return
+            self._started = False
+            if not self._transport:
+                raise RuntimeError("Transport not initialized")
+            await self._transport.start()
+            if not self._transport.is_running():
+                raise TransportError("CLI transport stopped during startup")
+            self._event_streams_closed = False
+            if self.config.startup_check:
+                try:
+                    await self._request(RPC_METHODS["get_state"], {})
+                except Exception as exc:
+                    stderr = self._transport.stderr_tail
+                    await self._transport.stop()
+                    self._close_event_streams(exc)
+                    detail = f"\nCLI stderr:\n{stderr}" if stderr else ""
+                    raise TransportError(f"CLI startup check failed: {exc}{detail}") from exc
+                finally:
+                    self._drain_event_queue()
+            if not self._transport.is_running():
+                raise TransportError("CLI transport stopped during startup")
+            self._started = True
 
     async def stop(self) -> None:
         """Stop the RPC client."""
-        if self._transport:
-            await self._transport.stop()
-        self._started = False
+        async with self._lifecycle_lock:
+            try:
+                if self._transport:
+                    await self._transport.stop()
+            finally:
+                self._started = False
+                self._close_event_streams()
 
     async def initialize(self, config: dict[str, Any] | None = None) -> dict[str, Any]:
         """Return current state.
@@ -157,48 +195,158 @@ class RPCClient:
     async def prompt(self, params: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
         """Send a prompt to the agent and stream SDK events."""
         async with self._prompt_lock:
-            self._drain_event_queue()
-            request_task = asyncio.create_task(self._request(RPC_METHODS["prompt"], params))
+            prompt_queue: EventQueue = asyncio.Queue(maxsize=EVENT_BACKLOG_LIMIT)
+            self._prompt_event_queue = prompt_queue
+            request_task: asyncio.Task[Any] | None = None
+            get_event: asyncio.Task[dict[str, Any] | None] | None = None
             seen_events = False
+            terminal_event_seen = False
+            request_result: Any = None
+            request_acknowledged = False
+            request_failed = False
+            try:
+                request_task = asyncio.create_task(self._request(RPC_METHODS["prompt"], params))
 
-            while not request_task.done():
-                get_event = asyncio.create_task(self._event_queue.get())
-                done, pending = await asyncio.wait(
-                    {request_task, get_event},
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
+                while not terminal_event_seen:
+                    get_event = asyncio.create_task(prompt_queue.get())
+                    if not request_acknowledged:
+                        done, _ = await asyncio.wait(
+                            {request_task, get_event},
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                        if request_task in done:
+                            try:
+                                request_result = await request_task
+                            except BaseException:
+                                request_failed = True
+                                raise
+                            request_acknowledged = True
 
-                if get_event in done:
-                    seen_events = True
-                    yield get_event.result()
-                else:
-                    get_event.cancel()
-                    with suppress(asyncio.CancelledError):
+                            if (
+                                not seen_events
+                                and isinstance(request_result, dict)
+                                and (
+                                    request_result.get("content") is not None
+                                    or request_result.get("sessionId") is not None
+                                    or request_result.get("session_id") is not None
+                                )
+                                and not get_event.done()
+                            ):
+                                get_event.cancel()
+                                with suppress(asyncio.CancelledError):
+                                    await get_event
+                                get_event = None
+                                session_id = (
+                                    request_result.get("sessionId")
+                                    or request_result.get("session_id")
+                                    or ""
+                                )
+                                yield {"type": "agent_start", "session_id": session_id}
+                                if request_result.get("content"):
+                                    yield {
+                                        "type": "message_end",
+                                        "content": request_result["content"],
+                                    }
+                                yield {
+                                    "type": "agent_end",
+                                    "session_id": session_id,
+                                    "reason": "completed",
+                                }
+                                seen_events = True
+                                terminal_event_seen = True
+                                break
+
+                            if get_event not in done:
+                                get_event.cancel()
+                                with suppress(asyncio.CancelledError):
+                                    await get_event
+                                get_event = None
+                                continue
+                    else:
                         await get_event
 
-                for task in pending:
-                    if task is not request_task:
-                        task.cancel()
+                    event = get_event.result()
+                    get_event = None
+                    if event is None:
+                        raise TransportError("Prompt event stream closed")
+                    seen_events = True
+                    terminal_event_seen = event.get("type") == "agent_end"
+                    yield event
+
+                if not request_acknowledged:
+                    request_result = await request_task
+                    request_acknowledged = True
+
+                if not seen_events and isinstance(request_result, dict):
+                    session_id = (
+                        request_result.get("sessionId") or request_result.get("session_id") or ""
+                    )
+                    yield {"type": "agent_start", "session_id": session_id}
+                    if request_result.get("content"):
+                        yield {"type": "message_end", "content": request_result["content"]}
+                    yield {
+                        "type": "agent_end",
+                        "session_id": session_id,
+                        "reason": "completed",
+                    }
+            finally:
+                try:
+                    if get_event is not None and not get_event.done():
+                        get_event.cancel()
                         with suppress(asyncio.CancelledError):
-                            await task
+                            await get_event
+                    if request_task is not None:
+                        try:
+                            if not terminal_event_seen and not request_failed:
+                                await self._settle_abandoned_prompt(prompt_queue)
+                        finally:
+                            if not request_task.done():
+                                request_task.cancel()
+                            with suppress(asyncio.CancelledError, Exception):
+                                await request_task
+                finally:
+                    if self._prompt_event_queue is prompt_queue:
+                        self._prompt_event_queue = None
 
-            while not self._event_queue.empty():
-                seen_events = True
-                yield self._event_queue.get_nowait()
+    async def _settle_abandoned_prompt(self, prompt_queue: EventQueue) -> None:
+        """Abort an accepted background turn and wait for its terminal event."""
 
-            result = await request_task
+        async def cleanup() -> bool:
+            try:
+                await self.abort()
+            except Exception:
+                return False
+            while True:
+                event = await prompt_queue.get()
+                if event is None:
+                    return False
+                if event.get("type") == "agent_end":
+                    return True
 
-            if not seen_events and isinstance(result, dict):
-                session_id = result.get("sessionId") or result.get("session_id") or ""
-                yield {"type": "agent_start", "session_id": session_id}
-                if result.get("content"):
-                    yield {"type": "message_end", "content": result["content"]}
-                yield {"type": "agent_end", "session_id": session_id, "reason": "completed"}
+        try:
+            settled = await asyncio.wait_for(cleanup(), timeout=PROMPT_CLEANUP_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            settled = False
+        if not settled:
+            await self.stop()
 
     async def events(self) -> AsyncIterator[dict[str, Any]]:
         """Stream all CLI notifications as SDK event dictionaries."""
-        while True:
-            yield await self._event_queue.get()
+        if self._event_streams_closed:
+            return
+        queue: EventQueue = asyncio.Queue(maxsize=EVENT_BACKLOG_LIMIT)
+        if not self._event_subscribers:
+            while not self._event_queue.empty():
+                self._put_bounded(queue, self._event_queue.get_nowait())
+        self._event_subscribers.add(queue)
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    return
+                yield event
+        finally:
+            self._event_subscribers.discard(queue)
 
     async def abort(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Abort the current operation."""
@@ -228,9 +376,61 @@ class RPCClient:
         """
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_supported_commands"], {}))
 
+    async def get_skills_registry(self, force_refresh: bool | None = None) -> dict[str, Any]:
+        """Get the community skill registry."""
+        params = {} if force_refresh is None else {"forceRefresh": force_refresh}
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["get_skills_registry"], params),
+        )
+
+    async def install_skill(
+        self,
+        skill_name: str,
+        scope: Literal["user", "project"],
+        force: bool | None = None,
+    ) -> dict[str, Any]:
+        """Install one community skill in user or project scope."""
+        params: dict[str, Any] = {"skillName": skill_name, "scope": scope}
+        if force is not None:
+            params["force"] = force
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["install_skill"], params),
+        )
+
+    async def list_mcp_servers(self) -> dict[str, Any]:
+        """List known MCP servers and their connection status."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["mcp_list_servers"], {}),
+        )
+
+    async def list_mcp_tools(self, server_name: str | None = None) -> dict[str, Any]:
+        """List MCP tools, optionally filtering by server name."""
+        params = {} if server_name is None else {"serverName": server_name}
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["mcp_list_tools"], params),
+        )
+
+    async def get_mcp_server_configs(self) -> dict[str, Any]:
+        """Get MCP server configurations from the CLI."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["mcp_get_server_configs"], {}),
+        )
+
     async def set_model(self, model: str) -> dict[str, Any]:
         """Set the active model."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["set_model"], {"model": model}))
+
+    async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
+        """Enable or disable plan mode."""
+        return cast(
+            dict[str, Any],
+            await self._request(RPC_METHODS["set_plan_mode"], {"enabled": enabled}),
+        )
 
     async def set_agent(self, agent: str) -> dict[str, Any]:
         """Set the active agent flag when supported by the CLI."""
@@ -323,11 +523,15 @@ class RPCClient:
 
     async def rescore_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
         """Apply current decision policy to stored measurements."""
-        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_rescore"], params))
+        return cast(
+            dict[str, Any], await self._request(RPC_METHODS["autoresearch_rescore"], params)
+        )
 
     async def compare_autoresearch(self, params: dict[str, Any]) -> dict[str, Any]:
         """Compare two autoresearch attempts."""
-        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_compare"], params))
+        return cast(
+            dict[str, Any], await self._request(RPC_METHODS["autoresearch_compare"], params)
+        )
 
     async def get_autoresearch_pareto(self) -> dict[str, Any]:
         """List constraint-passing non-dominated attempts."""
@@ -339,7 +543,9 @@ class RPCClient:
 
     async def prune_autoresearch(self, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Preview or explicitly apply autoresearch artifact pruning."""
-        return cast(dict[str, Any], await self._request(RPC_METHODS["autoresearch_prune"], params or {}))
+        return cast(
+            dict[str, Any], await self._request(RPC_METHODS["autoresearch_prune"], params or {})
+        )
 
     async def _request(self, method: str, params: dict[str, Any]) -> Any:
         """Send a request to the transport."""
@@ -493,10 +699,10 @@ class RPCClient:
             return
 
         event = self._notification_to_event(event_type, params)
-        self._event_queue.put_nowait(event)
+        self._publish_event(event)
 
         if method == "autohand.turnEnd":
-            self._event_queue.put_nowait(
+            self._publish_event(
                 {
                     "type": "agent_end",
                     "session_id": event.get("session_id") or event.get("turn_id", ""),
@@ -504,6 +710,46 @@ class RPCClient:
                     "timestamp": event.get("timestamp"),
                 }
             )
+
+    def _publish_event(self, event: dict[str, Any]) -> None:
+        """Broadcast one event without destructive competition between consumers."""
+        if self._event_streams_closed:
+            return
+        if not self._event_subscribers:
+            self._put_bounded(self._event_queue, event)
+        if self._prompt_event_queue is not None:
+            self._put_bounded(self._prompt_event_queue, event)
+        for queue in tuple(self._event_subscribers):
+            self._put_bounded(queue, event)
+
+    @staticmethod
+    def _put_bounded(queue: EventQueue, event: dict[str, Any] | None) -> None:
+        if queue.full():
+            with suppress(asyncio.QueueEmpty):
+                queue.get_nowait()
+        queue.put_nowait(event)
+
+    def _handle_termination(self, error: BaseException) -> None:
+        self._started = False
+        self._close_event_streams(error)
+        if self._termination_callback is not None:
+            try:
+                self._termination_callback(error)
+            except Exception:
+                logger.exception("Unhandled exception in client termination callback")
+
+    def _close_event_streams(self, _error: BaseException | None = None) -> None:
+        """Close every global event iterator and discard its queued notifications."""
+        self._event_streams_closed = True
+        self._drain_event_queue()
+        if self._prompt_event_queue is not None:
+            self._put_bounded(self._prompt_event_queue, None)
+        for queue in tuple(self._event_subscribers):
+            while not queue.empty():
+                with suppress(asyncio.QueueEmpty):
+                    queue.get_nowait()
+            self._put_bounded(queue, None)
+        self._event_subscribers.clear()
 
     def _notification_to_event(self, event_type: str, params: dict[str, Any]) -> dict[str, Any]:
         """Normalize CLI notification params into a Python-friendly event dict."""
@@ -513,7 +759,9 @@ class RPCClient:
             if camel in event and snake not in event:
                 event[snake] = event[camel]
         event["type"] = event_type
-        lifecycle_phase = AUTORESEARCH_LIFECYCLE_PHASES.get(method) if isinstance(method, str) else None
+        lifecycle_phase = (
+            AUTORESEARCH_LIFECYCLE_PHASES.get(method) if isinstance(method, str) else None
+        )
         if lifecycle_phase is not None:
             event["phase"] = lifecycle_phase
         return event

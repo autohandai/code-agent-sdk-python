@@ -4,9 +4,8 @@ Plan mode restricts the agent to read-only planning tools. It cannot write files
 
 ## Enabling Plan Mode
 
-The Python SDK does not expose a dedicated `set_plan_mode` RPC method on the client. Plan mode is controlled through the CLI startup flags or by prompting the agent to stay in read-only mode.
-
-Pass `plan_mode` when creating the SDK:
+Pass `plan_mode` when creating the SDK. After the CLI readiness check succeeds,
+the SDK applies it through `autohand.planModeSet` before `start()` returns:
 
 ```python
 sdk = AutohandSDK(
@@ -15,14 +14,10 @@ sdk = AutohandSDK(
 )
 ```
 
-Note: the Python SDK passes plan mode to the CLI via startup flags. The CLI handles the restriction. If the CLI does not support `plan_mode` as a startup flag, you can achieve the same effect by prompting the agent explicitly:
+Change the mode during a live session with the same RPC:
 
 ```python
-async for event in sdk.stream_prompt(
-    "Plan a refactor to split utils.py into smaller modules. Do not make any changes."
-):
-    if event["type"] == "message_update":
-        print(event.get("delta", ""), end="")
+await sdk.set_plan_mode(False)
 ```
 
 ## Two-Phase Workflow
@@ -83,7 +78,8 @@ sdk = AutohandSDK(
 
 ## Legacy Note
 
-`permission_mode="plan"` was accepted in older versions but is deprecated. New code should use explicit read-only prompting or the `plan_mode` config field if the CLI supports it.
+`permission_mode="plan"` was accepted in older versions but is deprecated. New
+code should use the typed `plan_mode` config field or `set_plan_mode()`.
 
 ## SDLC Integration
 

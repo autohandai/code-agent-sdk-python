@@ -36,125 +36,7 @@ Examples:
     ... )
 """
 
-from autohand_sdk.agent import Agent
-from autohand_sdk.errors import (
-    AutohandSDKError,
-    RequestTimeoutError,
-    RPCError,
-    TransportError,
-    TransportNotStartedError,
-)
-from autohand_sdk.rpc_client import RPCClient
-from autohand_sdk.sdk import AutohandSDK
-from autohand_sdk.transport import Transport
-from autohand_sdk.types import (
-    # Abort types
-    AbortParams,
-    AbortResult,
-    AccountInfo,
-    AgentInfo,
-    # AGENTS.md types
-    AgentsMdSettings,
-    AutohandEnvVars,
-    AutoresearchChecksResult,
-    AutoresearchCompareParams,
-    AutoresearchCompareResult,
-    AutoresearchComparison,
-    AutoresearchComparisonSide,
-    AutoresearchConstraint,
-    AutoresearchConstraintResult,
-    AutoresearchDecisionRecord,
-    AutoresearchEvaluationRecord,
-    AutoresearchEvaluationSample,
-    AutoresearchEvent,
-    AutoresearchExecutionResult,
-    AutoresearchHistoryAttempt,
-    AutoresearchHistoryResult,
-    AutoresearchMaterializationState,
-    AutoresearchMetricAggregate,
-    AutoresearchOperation,
-    AutoresearchOperationEvent,
-    AutoresearchOptimizationDirection,
-    AutoresearchParetoResult,
-    AutoresearchPinParams,
-    AutoresearchPinResult,
-    AutoresearchPruneCandidate,
-    AutoresearchPruneParams,
-    AutoresearchPruneResult,
-    AutoresearchReplayParams,
-    AutoresearchReplayResult,
-    AutoresearchRescoreParams,
-    AutoresearchRescoreResult,
-    AutoresearchRetentionOptions,
-    AutoresearchSamplingOptions,
-    AutoresearchSecondaryObjective,
-    AutoresearchStartParams,
-    AutoresearchStartResult,
-    AutoresearchState,
-    AutoresearchStatusResult,
-    AutoresearchStopResult,
-    AutoresearchSubagentOptions,
-    CompletedGoal,
-    ContextSettings,
-    # Context types
-    ContextUsage,
-    CreateGoalParams,
-    FeatureFlagSettings,
-    GetMessagesParams,
-    GetMessagesResult,
-    GetStateParams,
-    GetStateResult,
-    GoalBudgetParams,
-    GoalFeatureDisabledResult,
-    GoalMutationResult,
-    GoalMutationRPCResult,
-    GoalSnapshot,
-    GoalSnapshotResult,
-    GoalState,
-    GoalStatus,
-    GoalTelemetry,
-    GoalTemplateMetadata,
-    GoalTemplatesResult,
-    McpServerConfig,
-    # Model types
-    ModelInfo,
-    # Permission types
-    PermissionMode,
-    PermissionResponseParams,
-    PermissionRule,
-    PermissionSettings,
-    PromptParams,
-    PromptResult,
-    ProviderConfigError,
-    # Provider types
-    ProviderName,
-    QueuedGoal,
-    # Core types
-    SDKConfig,
-    SDKEvent,
-    SessionMetadata,
-    SessionSettings,
-    # Session types
-    SessionStats,
-    SessionType,
-    SkillDefinition,
-    # Skill types
-    SkillReference,
-    SkillSettings,
-    SkillSource,
-    # Tool types
-    Tool,
-    TypedSDKEvent,
-    UpdateGoalParams,
-    create_default_agents_md,
-    detect_provider_from_model,
-    get_skill_name,
-    get_skill_path,
-    is_skill_file_path,
-    load_agents_md,
-    parse_sdk_event,
-    validate_provider_config,
-)
+import importlib
 
 __version__ = "0.1.0"
 __all__ = [
@@ -198,6 +80,19 @@ __all__ = [
     "GoalTemplatesResult",
     # Feature types
     "FeatureFlagSettings",
+    # Skills registry and MCP discovery types
+    "CommunitySkill",
+    "SkillRegistryCategory",
+    "GetSkillsRegistryParams",
+    "GetSkillsRegistryResult",
+    "InstallSkillParams",
+    "InstallSkillResult",
+    "McpServerSummary",
+    "McpListServersResult",
+    "McpListToolsParams",
+    "McpToolInfo",
+    "McpListToolsResult",
+    "McpGetServerConfigsResult",
     # Autoresearch types
     "AutoresearchSubagentOptions",
     "AutoresearchOptimizationDirection",
@@ -280,3 +175,48 @@ __all__ = [
     # Version
     "__version__",
 ]
+
+_ERROR_EXPORTS = {
+    "AutohandSDKError",
+    "RequestTimeoutError",
+    "RPCError",
+    "TransportError",
+    "TransportNotStartedError",
+}
+_EXPORT_MODULES = {
+    name: "autohand_sdk.types"
+    for name in __all__
+    if name
+    not in {
+        "__version__",
+        "Agent",
+        "AutohandSDK",
+        "RPCClient",
+        "Transport",
+        *_ERROR_EXPORTS,
+    }
+}
+_EXPORT_MODULES.update(
+    {
+        "Agent": "autohand_sdk.agent",
+        "AutohandSDK": "autohand_sdk.sdk",
+        "RPCClient": "autohand_sdk.rpc_client",
+        "Transport": "autohand_sdk.transport",
+        **dict.fromkeys(_ERROR_EXPORTS, "autohand_sdk.errors"),
+    }
+)
+
+
+def __getattr__(name: str):
+    """Load documented public exports on first access."""
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(module_name), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Include lazy public exports in interactive discovery."""
+    return sorted({*globals(), *__all__})

@@ -1,4 +1,5 @@
 """Transport layer for CLI subprocess communication."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +10,7 @@ import platform
 import shutil
 from collections import defaultdict
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -24,11 +26,13 @@ logger = logging.getLogger(__name__)
 
 JsonDict = dict[str, Any]
 NotificationCallback = Callable[[JsonDict], None]
+TerminationCallback = Callable[[BaseException], None]
 
 
 @dataclass
 class TransportOptions:
     """Configuration options for the Transport layer."""
+
     cwd: str | None = None
     cli_path: str | None = None
     debug: bool = False
@@ -94,17 +98,30 @@ class Transport:
         self._process: asyncio.subprocess.Process | None = None
         self._callbacks: dict[int, asyncio.Future[JsonDict]] = {}
         self._notification_callbacks: dict[str, list[NotificationCallback]] = defaultdict(list)
+        self._termination_callbacks: list[TerminationCallback] = []
         self._request_id = 0
         self._running = False
         self._stdout_task: asyncio.Task[None] | None = None
         self._stderr_task: asyncio.Task[None] | None = None
         self._stderr_lines: list[str] = []
+        self._lifecycle_lock = asyncio.Lock()
+        self._write_lock = asyncio.Lock()
+        self._retirement_tasks: set[asyncio.Task[None]] = set()
 
     async def start(self) -> None:
         """Start the CLI subprocess."""
-        if self.is_running():
-            return
+        async with self._lifecycle_lock:
+            if self.is_running():
+                return
+            if self._process is not None:
+                await self._stop_process(
+                    self._process,
+                    TransportError("Retiring an unusable transport generation"),
+                )
+            await self._start_process()
 
+    async def _start_process(self) -> None:
+        """Start one process while the lifecycle lock is held."""
         cli_path = self.options.cli_path or self._detect_cli_binary()
         cwd = self.options.cwd or str(Path.cwd())
 
@@ -214,7 +231,8 @@ class Transport:
                 env["AUTOHAND_AI_BASE_URL"] = self.options.base_url
         env.update(self.options.env_vars)
 
-        self._process = await asyncio.create_subprocess_exec(
+        self._stderr_lines.clear()
+        process = await asyncio.create_subprocess_exec(
             *args,
             cwd=cwd,
             stdin=asyncio.subprocess.PIPE,
@@ -222,49 +240,86 @@ class Transport:
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
+        self._process = process
         self._running = True
-        self._stdout_task = asyncio.create_task(self._read_stdout())
-        self._stderr_task = asyncio.create_task(self._read_stderr())
+        self._stdout_task = asyncio.create_task(self._read_stdout(process))
+        self._stderr_task = asyncio.create_task(self._read_stderr(process))
         await asyncio.sleep(0)
-        if self._process.returncode is not None:
-            returncode = self._process.returncode
+        if process.returncode is not None:
+            returncode = process.returncode
             stderr_tail = self._format_stderr_tail()
-            await self.stop()
+            await self._stop_process(
+                process,
+                TransportError(
+                    f"CLI process exited during startup with code {returncode}{stderr_tail}"
+                ),
+            )
             raise TransportError(
-                f"CLI process exited during startup with code {returncode}"
-                f"{stderr_tail}"
+                f"CLI process exited during startup with code {returncode}{stderr_tail}"
             )
 
     async def stop(self) -> None:
         """Stop the CLI subprocess."""
-        if not self._process:
+        async with self._lifecycle_lock:
+            if self._process is None:
+                return
+            await self._stop_process(
+                self._process,
+                TransportError("Transport stopped before receiving a response"),
+            )
+
+    async def _stop_process(
+        self,
+        process: asyncio.subprocess.Process,
+        error: BaseException,
+    ) -> None:
+        """Stop one captured process without mutating a newer generation."""
+        if self._process is not process:
             return
         self._running = False
+        self._fail_pending_requests(error)
+        if process.stdin:
+            with suppress(OSError, RuntimeError):
+                process.stdin.close()
 
-        for task in (self._stdout_task, self._stderr_task):
-            if task and not task.done():
+        current_task = asyncio.current_task()
+        reader_tasks = [
+            task
+            for task in (self._stdout_task, self._stderr_task)
+            if task is not None and task is not current_task
+        ]
+        for task in reader_tasks:
+            if not task.done():
                 task.cancel()
+        if reader_tasks:
+            await asyncio.gather(*reader_tasks, return_exceptions=True)
 
-        if self._process.stdin:
-            self._process.stdin.close()
-        if self._process.returncode is None:
+        async with self._write_lock:
+            if process.stdin:
+                with suppress(OSError, RuntimeError):
+                    await process.stdin.wait_closed()
+        if process.returncode is None:
             try:
-                self._process.terminate()
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
+                process.terminate()
+                await asyncio.wait_for(process.wait(), timeout=1.0)
             except asyncio.TimeoutError:
-                self._process.kill()
-                await self._process.wait()
+                with suppress(ProcessLookupError):
+                    process.kill()
+                with suppress(asyncio.TimeoutError):
+                    await asyncio.wait_for(process.wait(), timeout=1.0)
+            except ProcessLookupError:
+                pass
         self._process = None
         self._stdout_task = None
         self._stderr_task = None
-        self._fail_pending_requests(TransportError("Transport stopped before receiving a response"))
 
     async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
         """Send a JSON-RPC request and wait for response."""
-        if not self._process or not self._process.stdin:
+        process = self._process
+        if not process or not process.stdin or not self._running:
             raise TransportNotStartedError("Transport not started")
-        if self._process.returncode is not None:
-            raise TransportError(f"Transport process exited with code {self._process.returncode}")
+        if process.returncode is not None:
+            raise TransportError(f"Transport process exited with code {process.returncode}")
 
         self._request_id += 1
         request_id = self._request_id
@@ -274,21 +329,24 @@ class Transport:
         self._callbacks[request_id] = future
         data = json.dumps(request) + "\n"
         try:
-            self._process.stdin.write(data.encode())
-            await self._process.stdin.drain()
-        except (BrokenPipeError, ConnectionResetError, RuntimeError) as exc:
-            self._callbacks.pop(request_id, None)
-            raise TransportError(
-                f"Failed to write RPC request {method} to CLI stdin"
-                f"{self._format_stderr_tail()}"
-            ) from exc
+            try:
+                async with self._write_lock:
+                    if self._process is not process or not self._running or not process.stdin:
+                        raise TransportNotStartedError("Transport generation is no longer active")
+                    process.stdin.write(data.encode())
+                    await process.stdin.drain()
+            except (BrokenPipeError, ConnectionResetError, RuntimeError) as exc:
+                raise TransportError(
+                    f"Failed to write RPC request {method} to CLI stdin{self._format_stderr_tail()}"
+                ) from exc
 
-        try:
             response = await asyncio.wait_for(future, timeout=self.options.timeout / 1000)
         except asyncio.TimeoutError:
             raise RequestTimeoutError(f"Request timeout: {method}") from None
         finally:
             self._callbacks.pop(request_id, None)
+            if not future.done():
+                future.cancel()
 
         if "error" in response:
             error = response["error"]
@@ -299,9 +357,7 @@ class Transport:
             )
         return response.get("result")
 
-    def on_notification(
-        self, method: str, callback: NotificationCallback
-    ) -> Callable[[], None]:
+    def on_notification(self, method: str, callback: NotificationCallback) -> Callable[[], None]:
         """Register a notification callback.
 
         Args:
@@ -319,6 +375,16 @@ class Transport:
                 callbacks.remove(callback)
             except ValueError:
                 return
+
+        return unsubscribe
+
+    def on_termination(self, callback: TerminationCallback) -> Callable[[], None]:
+        """Register a callback for an unexpected stdout failure or closure."""
+        self._termination_callbacks.append(callback)
+
+        def unsubscribe() -> None:
+            with suppress(ValueError):
+                self._termination_callbacks.remove(callback)
 
         return unsubscribe
 
@@ -344,10 +410,12 @@ class Transport:
         if package_path.exists():
             return str(package_path)
 
-        # Fall back to PATH
-        cli_path = shutil.which(binary_name.replace(".exe", ""))
-        if cli_path:
-            return cli_path
+        # Prefer the standard executable installed by the Autohand CLI, then
+        # retain compatibility with older platform-specific installations.
+        for candidate in ("autohand", binary_name):
+            cli_path = shutil.which(candidate)
+            if cli_path:
+                return cli_path
 
         return binary_name
 
@@ -387,22 +455,33 @@ class Transport:
             content = src_path.read_text()
             dest_path.write_text(content)
 
-    async def _read_stdout(self) -> None:
+    async def _read_stdout(self, process: asyncio.subprocess.Process | None = None) -> None:
         """Read JSON-RPC responses and notifications from stdout."""
-        if not self._process or not self._process.stdout:
+        process = process or self._process
+        if not process or not process.stdout:
             return
 
-        while self._running:
+        while self._process is process and self._running:
             try:
-                line = await self._process.stdout.readline()
+                line = await process.stdout.readline()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                self._fail_pending_requests(TransportError(f"Failed reading CLI stdout: {exc}"))
+                if self._process is process:
+                    self._running = False
+                    error = TransportError(f"Failed reading CLI stdout: {exc}")
+                    self._fail_pending_requests(error)
+                    self._notify_termination(error)
+                    self._schedule_retirement(process, error)
                 break
 
             if not line:
-                self._fail_pending_requests(TransportError("CLI stdout closed"))
+                if self._process is process:
+                    self._running = False
+                    error = TransportError("CLI stdout closed")
+                    self._fail_pending_requests(error)
+                    self._notify_termination(error)
+                    self._schedule_retirement(process, error)
                 break
 
             self._handle_stdout_line(line)
@@ -459,13 +538,22 @@ class Transport:
                 future.set_exception(error)
         self._callbacks.clear()
 
-    async def _read_stderr(self) -> None:
-        """Read stderr from the process."""
-        if not self._process or not self._process.stderr:
-            return
-        while self._running:
+    def _notify_termination(self, error: BaseException) -> None:
+        """Notify lifecycle consumers without letting callback errors escape the reader."""
+        for callback in tuple(self._termination_callbacks):
             try:
-                line = await self._process.stderr.readline()
+                callback(error)
+            except Exception:
+                logger.exception("Unhandled exception in transport termination callback")
+
+    async def _read_stderr(self, process: asyncio.subprocess.Process | None = None) -> None:
+        """Read stderr from the process."""
+        process = process or self._process
+        if not process or not process.stderr:
+            return
+        while self._process is process and self._running:
+            try:
+                line = await process.stderr.readline()
                 if not line:
                     break
                 text = line.decode(errors="replace").strip()
@@ -491,4 +579,32 @@ class Transport:
 
     def is_running(self) -> bool:
         """Check if the process is running."""
-        return self._process is not None and self._process.returncode is None
+        return self._running and self._process is not None and self._process.returncode is None
+
+    async def _retire_generation(
+        self,
+        process: asyncio.subprocess.Process,
+        error: BaseException,
+    ) -> None:
+        async with self._lifecycle_lock:
+            await self._stop_process(process, error)
+
+    def _schedule_retirement(
+        self,
+        process: asyncio.subprocess.Process,
+        error: BaseException,
+    ) -> None:
+        """Keep unexpected-exit cleanup alive until it releases the child."""
+        task = asyncio.create_task(self._retire_generation(process, error))
+        self._retirement_tasks.add(task)
+        task.add_done_callback(self._finish_retirement)
+
+    def _finish_retirement(self, task: asyncio.Task[None]) -> None:
+        """Observe background cleanup failures and release the strong task reference."""
+        self._retirement_tasks.discard(task)
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Unexpected failure while retiring a CLI process generation")

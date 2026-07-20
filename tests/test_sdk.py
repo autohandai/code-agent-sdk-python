@@ -1,4 +1,5 @@
 """Tests for the main SDK class."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,7 +21,9 @@ from autohand_sdk.types import (
 @pytest.fixture(autouse=True)
 def mock_cli_binary():
     """Mock CLI binary detection for all tests."""
-    with patch("autohand_sdk.transport.Transport._detect_cli_binary", return_value="/mock/autohand"):
+    with patch(
+        "autohand_sdk.transport.Transport._detect_cli_binary", return_value="/mock/autohand"
+    ):
         yield
 
 
@@ -51,11 +54,14 @@ class TestSDKInitialization:
         assert sdk.config.cwd == "/merged"
 
     def test_init_with_skills(self) -> None:
-        sdk = AutohandSDK(model="fantail", api_key="ah-test-key", skill_refs=["typescript", "react"])
+        sdk = AutohandSDK(
+            model="fantail", api_key="ah-test-key", skill_refs=["typescript", "react"]
+        )
         assert sdk.skills == ["typescript", "react"]
 
     def test_init_with_nested_skills(self) -> None:
         from autohand_sdk.types import SkillSettings
+
         config = SDKConfig()
         config.skills = SkillSettings(skills=["typescript", "react"], auto_skill=True)
         sdk = AutohandSDK(config)
@@ -86,6 +92,29 @@ class TestSDKSkills:
         skills.append("react")  # Modifying returned list
         assert sdk.skills == ["typescript"]  # Original unchanged
 
+    def test_set_skills_while_started_preserves_live_client(self) -> None:
+        sdk = AutohandSDK(skill_refs=["typescript"])
+        original_client = sdk._client
+        sdk._started = True
+
+        with pytest.raises(RuntimeError, match=r"configured before start\(\)"):
+            sdk.skills = ["react"]
+
+        assert sdk._client is original_client
+        assert sdk.skills == ["typescript"]
+        assert sdk.config.skill_refs == ["typescript"]
+
+    def test_set_skills_while_starting_preserves_client(self) -> None:
+        sdk = AutohandSDK(skill_refs=["typescript"])
+        original_client = sdk._client
+        sdk._starting = True
+
+        with pytest.raises(RuntimeError, match=r"configured before start\(\)"):
+            sdk.skills = ["react"]
+
+        assert sdk._client is original_client
+        assert sdk.skills == ["typescript"]
+
 
 class TestSDKLifecycle:
     """Tests for SDK lifecycle."""
@@ -96,6 +125,8 @@ class TestSDKLifecycle:
         # Mock the entire client to avoid subprocess creation
         with patch("autohand_sdk.sdk.RPCClient") as MockClient:
             mock_instance = AsyncMock()
+            mock_instance._started = True
+            mock_instance.is_running = MagicMock(return_value=True)
             MockClient.return_value = mock_instance
             # Recreate sdk with mocked client
             sdk = AutohandSDK()
@@ -107,6 +138,8 @@ class TestSDKLifecycle:
     async def test_start_applies_feature_settings(self) -> None:
         with patch("autohand_sdk.sdk.RPCClient") as mock_client_class:
             mock_client = AsyncMock()
+            mock_client._started = True
+            mock_client.is_running = MagicMock(return_value=True)
             mock_client_class.return_value = mock_client
             sdk = AutohandSDK(
                 features=FeatureFlagSettings(
@@ -127,7 +160,10 @@ class TestSDKLifecycle:
     async def test_start_already_started(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "start", new_callable=AsyncMock) as mock_start:
+        with (
+            patch.object(sdk._client, "is_running", return_value=True),
+            patch.object(sdk._client, "start", new_callable=AsyncMock) as mock_start,
+        ):
             await sdk.start()
             mock_start.assert_not_called()
 
@@ -135,11 +171,27 @@ class TestSDKLifecycle:
     async def test_start_rebuilds_client_if_skills_changed(self) -> None:
         with patch("autohand_sdk.sdk.RPCClient") as MockClient:
             mock_instance = AsyncMock()
+            mock_instance.is_running = MagicMock(return_value=False)
             MockClient.return_value = mock_instance
             sdk = AutohandSDK()
             sdk.skills = ["typescript"]  # Set after init
             # After setting skills, client should be recreated
             assert sdk._config.skill_refs == sdk._skills
+
+    @pytest.mark.asyncio
+    async def test_start_does_not_replace_running_client_when_skills_drift(self) -> None:
+        sdk = AutohandSDK(skill_refs=["typescript"])
+        original_client = sdk._client
+        assert original_client is not None
+        sdk._skills = ["react"]
+
+        with (
+            patch.object(original_client, "is_running", return_value=True),
+            pytest.raises(RuntimeError, match="CLI transport is running"),
+        ):
+            await sdk.start()
+
+        assert sdk._client is original_client
 
     @pytest.mark.asyncio
     async def test_stop(self) -> None:
@@ -162,8 +214,10 @@ class TestSDKContextManager:
 
     @pytest.mark.asyncio
     async def test_context_manager(self) -> None:
-        with patch.object(AutohandSDK, "start", new_callable=AsyncMock) as mock_start, \
-             patch.object(AutohandSDK, "stop", new_callable=AsyncMock) as mock_stop:
+        with (
+            patch.object(AutohandSDK, "start", new_callable=AsyncMock) as mock_start,
+            patch.object(AutohandSDK, "stop", new_callable=AsyncMock) as mock_stop,
+        ):
             async with AutohandSDK():
                 mock_start.assert_called_once()
             mock_stop.assert_called_once()
@@ -216,7 +270,12 @@ class TestSDKMethods:
     async def test_abort(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "abort", new_callable=AsyncMock, return_value={"success": True, "message": None}):
+        with patch.object(
+            sdk._client,
+            "abort",
+            new_callable=AsyncMock,
+            return_value={"success": True, "message": None},
+        ):
             result = await sdk.abort("User cancelled")
             assert result.success is True
 
@@ -231,12 +290,17 @@ class TestSDKMethods:
     async def test_get_state(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_state", new_callable=AsyncMock, return_value={
-            "status": "idle",
-            "model": "fantail",
-            "workspace": "/test",
-            "message_count": 0,
-        }):
+        with patch.object(
+            sdk._client,
+            "get_state",
+            new_callable=AsyncMock,
+            return_value={
+                "status": "idle",
+                "model": "fantail",
+                "workspace": "/test",
+                "message_count": 0,
+            },
+        ):
             result = await sdk.get_state()
             assert result.status == "idle"
             assert result.model == "fantail"
@@ -252,7 +316,9 @@ class TestSDKMethods:
     async def test_get_messages(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_messages", new_callable=AsyncMock, return_value={"messages": []}):
+        with patch.object(
+            sdk._client, "get_messages", new_callable=AsyncMock, return_value={"messages": []}
+        ):
             result = await sdk.get_messages(limit=10)
             assert result.messages == []
 
@@ -267,7 +333,12 @@ class TestSDKMethods:
     async def test_get_models(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_models", new_callable=AsyncMock, return_value={"models": [{"id": "fantail"}]}):
+        with patch.object(
+            sdk._client,
+            "get_models",
+            new_callable=AsyncMock,
+            return_value={"models": [{"id": "fantail"}]},
+        ):
             result = await sdk.get_models()
             assert len(result) == 1
             assert result[0]["id"] == "fantail"
@@ -276,7 +347,9 @@ class TestSDKMethods:
     async def test_get_agents(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_agents", new_callable=AsyncMock, return_value={"agents": []}):
+        with patch.object(
+            sdk._client, "get_agents", new_callable=AsyncMock, return_value={"agents": []}
+        ):
             result = await sdk.get_agents()
             assert result == []
 
@@ -333,7 +406,9 @@ class TestSDKMethods:
     async def test_set_model(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "set_model", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            sdk._client, "set_model", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await sdk.set_model("fantail")
             assert result["success"]
             assert sdk.config.model == "fantail"
@@ -342,7 +417,9 @@ class TestSDKMethods:
     async def test_set_agent(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "set_agent", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            sdk._client, "set_agent", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await sdk.set_agent("code-reviewer")
             assert result["success"]
 
@@ -350,7 +427,9 @@ class TestSDKMethods:
     async def test_set_temperature(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "set_temperature", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            sdk._client, "set_temperature", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await sdk.set_temperature(0.5)
             assert result["success"]
             assert sdk.config.temperature == 0.5
@@ -376,7 +455,12 @@ class TestSDKMethods:
     async def test_get_account_info(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "get_account_info", new_callable=AsyncMock, return_value={"email": "test@example.com"}):
+        with patch.object(
+            sdk._client,
+            "get_account_info",
+            new_callable=AsyncMock,
+            return_value={"email": "test@example.com"},
+        ):
             result = await sdk.get_account_info()
             assert result["email"] == "test@example.com"
 
@@ -384,7 +468,9 @@ class TestSDKMethods:
     async def test_save_session(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "save_session", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            sdk._client, "save_session", new_callable=AsyncMock, return_value={"success": True}
+        ):
             result = await sdk.save_session()
             assert result["success"]
 
@@ -455,9 +541,7 @@ class TestSDKMethods:
         create.assert_awaited_once_with({"objective": "Ship parity", "tokenBudget": 1000})
         update.assert_awaited_once_with({"tokenBudget": None})
         assert isinstance(updated, GoalMutationResult)
-        queue.assert_awaited_once_with(
-            {"objective": "Document parity", "timeBudgetSeconds": 60}
-        )
+        queue.assert_awaited_once_with({"objective": "Document parity", "timeBudgetSeconds": 60})
         assert isinstance(queued, GoalMutationResult)
         start_queued.assert_awaited_once_with()
         assert isinstance(started, GoalMutationResult)
@@ -488,7 +572,9 @@ class TestSDKMethods:
             "statusText": "Ready",
             "runsLogged": 0,
         }
-        with patch.object(sdk._client, "start_autoresearch", new_callable=AsyncMock, return_value=response) as start:
+        with patch.object(
+            sdk._client, "start_autoresearch", new_callable=AsyncMock, return_value=response
+        ) as start:
             result = await sdk.start_autoresearch(
                 objective="Improve latency",
                 max_iterations=5,
@@ -510,9 +596,30 @@ class TestSDKMethods:
         sdk = AutohandSDK()
         sdk._started = True
         with (
-            patch.object(sdk._client, "get_autoresearch_history", new_callable=AsyncMock, return_value={"success": True, "attempts": []}),
-            patch.object(sdk._client, "get_autoresearch_pareto", new_callable=AsyncMock, return_value={"success": True, "attemptIds": ["a1"]}),
-            patch.object(sdk._client, "prune_autoresearch", new_callable=AsyncMock, return_value={"success": True, "applied": False, "candidates": [], "bytesFreed": 0, "remainingBytes": 12}),
+            patch.object(
+                sdk._client,
+                "get_autoresearch_history",
+                new_callable=AsyncMock,
+                return_value={"success": True, "attempts": []},
+            ),
+            patch.object(
+                sdk._client,
+                "get_autoresearch_pareto",
+                new_callable=AsyncMock,
+                return_value={"success": True, "attemptIds": ["a1"]},
+            ),
+            patch.object(
+                sdk._client,
+                "prune_autoresearch",
+                new_callable=AsyncMock,
+                return_value={
+                    "success": True,
+                    "applied": False,
+                    "candidates": [],
+                    "bytesFreed": 0,
+                    "remainingBytes": 12,
+                },
+            ),
         ):
             history = await sdk.get_autoresearch_history()
             pareto = await sdk.get_autoresearch_pareto()
@@ -526,7 +633,12 @@ class TestSDKMethods:
     async def test_respond_to_permission(self) -> None:
         sdk = AutohandSDK()
         sdk._started = True
-        with patch.object(sdk._client, "respond_to_permission", new_callable=AsyncMock, return_value={"success": True}):
+        with patch.object(
+            sdk._client,
+            "respond_to_permission",
+            new_callable=AsyncMock,
+            return_value={"success": True},
+        ):
             result = await sdk.respond_to_permission("req-123", decision="allow")
             assert result["success"]
 

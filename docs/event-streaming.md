@@ -142,3 +142,24 @@ async for event in sdk.events():
 ```
 
 This includes lifecycle events like `agent_start` and `agent_end`.
+Each subscriber receives its own copy. Stopping the SDK or an unexpected CLI
+termination closes blocked event iterators, so consumer tasks do not need a
+separate wake-up mechanism during shutdown.
+
+Prompt, global-subscriber, and pre-subscription backlog queues retain at most
+1,024 events each. When a slow consumer reaches that limit, the oldest queued
+event is discarded so the transport cannot grow memory without bound. The first
+global subscriber receives notifications that arrived before it subscribed;
+that compatibility backlog is transferred once rather than replayed to later
+subscribers.
+
+## Prompt acceptance and early close
+
+`autohand.prompt` is ACK-first: its `{success: true}` JSON-RPC result only means
+the CLI accepted the turn. `stream_prompt()` continues consuming notifications
+until `agent_end` (including the terminal event synthesized from `turn_end`).
+
+Closing or breaking out of a prompt iterator before that terminal boundary
+sends `autohand.abort` and drains the abandoned turn. If the CLI does not emit
+`agent_end` within two seconds, the SDK stops that process generation. Start the
+same SDK instance again to create a clean generation.

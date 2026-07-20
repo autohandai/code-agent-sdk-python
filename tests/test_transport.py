@@ -1,4 +1,5 @@
 """Tests for the Transport layer."""
+
 from __future__ import annotations
 
 import asyncio
@@ -107,9 +108,7 @@ class TestTransportSkillCopying:
         skill_file = skills_dir / "SKILL.md"
         skill_file.write_text("# Custom Skill")
 
-        transport = Transport(
-            TransportOptions(skills=["typescript", "./skills/custom/SKILL.md"])
-        )
+        transport = Transport(TransportOptions(skills=["typescript", "./skills/custom/SKILL.md"]))
         home_dir = tmp_path / "home"
         monkeypatch.setenv("HOME", str(home_dir))
 
@@ -123,9 +122,7 @@ class TestTransportSkillCopying:
 
     @pytest.mark.asyncio
     async def test_copy_skill_files_nonexistent_path(self, tmp_path: Path, monkeypatch) -> None:
-        transport = Transport(
-            TransportOptions(skills=["./skills/nonexistent/SKILL.md"])
-        )
+        transport = Transport(TransportOptions(skills=["./skills/nonexistent/SKILL.md"]))
         home_dir = tmp_path / "home"
         monkeypatch.setenv("HOME", str(home_dir))
 
@@ -177,7 +174,7 @@ class TestTransportDetectCLIBinary:
         transport = Transport()
         result = transport._detect_cli_binary()
         assert isinstance(result, str)
-        assert result.startswith("autohand-")
+        assert Path(result).name.startswith("autohand")
 
     def test_detects_package_path(self, tmp_path: Path) -> None:
         transport = Transport()
@@ -422,12 +419,15 @@ class TestTransportStartArguments:
             "--display-language",
             "en-NZ",
         ]
-        assert argv[argv.index("--system-prompt-file") : argv.index("--system-prompt-file") + 2] == [
+        assert argv[
+            argv.index("--system-prompt-file") : argv.index("--system-prompt-file") + 2
+        ] == [
             "--system-prompt-file",
             "system.md",
         ]
         assert argv[
-            argv.index("--append-system-prompt-file") : argv.index("--append-system-prompt-file") + 2
+            argv.index("--append-system-prompt-file") : argv.index("--append-system-prompt-file")
+            + 2
         ] == ["--append-system-prompt-file", "append.md"]
         assert argv[argv.index("--mcp-config") : argv.index("--mcp-config") + 2] == [
             "--mcp-config",
@@ -442,7 +442,10 @@ class TestTransportStartArguments:
             "./plugins",
         ]
         assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "fantail"]
-        assert argv[argv.index("--skills") : argv.index("--skills") + 2] == ["--skills", "typescript"]
+        assert argv[argv.index("--skills") : argv.index("--skills") + 2] == [
+            "--skills",
+            "typescript",
+        ]
         assert "--custom" in argv
 
 

@@ -49,30 +49,64 @@ class AutohandEnvVars(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    AUTOHAND_DEBUG: str | None = Field(None, description="Enable debug logging mode ('1' to enable)")
+    AUTOHAND_DEBUG: str | None = Field(
+        None, description="Enable debug logging mode ('1' to enable)"
+    )
     AUTOHAND_HOME: str | None = Field(None, description="Base directory for all Autohand user data")
-    AUTOHAND_API_URL: str | None = Field(None, description="API base URL for authentication and sync services")
+    AUTOHAND_API_URL: str | None = Field(
+        None, description="API base URL for authentication and sync services"
+    )
     AUTOHAND_CONFIG: str | None = Field(None, description="Config file path override")
-    AUTOHAND_AI_API_KEY: str | None = Field(None, description="Autohand AI API key for SDK Cloud usage")
+    AUTOHAND_AI_API_KEY: str | None = Field(
+        None, description="Autohand AI API key for SDK Cloud usage"
+    )
     AUTOHAND_AI_BASE_URL: str | None = Field(None, description="Autohand AI base URL override")
-    AUTOHAND_AI_PLAN: str | None = Field(None, description="Autohand AI plan style (cloud or local)")
-    AUTOHAND_CLIENT_NAME: str | None = Field(None, description="Client identifier for ACP extensions (e.g., 'zed', 'terminal')")
+    AUTOHAND_AI_PLAN: str | None = Field(
+        None, description="Autohand AI plan style (cloud or local)"
+    )
+    AUTOHAND_CLIENT_NAME: str | None = Field(
+        None, description="Client identifier for ACP extensions (e.g., 'zed', 'terminal')"
+    )
     AUTOHAND_CLIENT_VERSION: str | None = Field(None, description="Client version string")
     AUTOHAND_CODE: str | None = Field(None, description="Auth code for headless setup")
     AUTOHAND_LOCALE: str | None = Field(None, description="Display language locale override")
-    AUTOHAND_NO_BANNER: str | None = Field(None, description="Suppress startup banner ('1' to suppress)")
-    AUTOHAND_NON_INTERACTIVE: str | None = Field(None, description="Force non-interactive mode ('1' to enable)")
-    AUTOHAND_PERMISSION_CALLBACK_TIMEOUT: str | None = Field(None, description="Permission callback timeout in milliseconds")
-    AUTOHAND_PERMISSION_CALLBACK_URL: str | None = Field(None, description="Permission callback URL for external approval")
-    AUTOHAND_SECRET: str | None = Field(None, description="Company/enterprise secret for team features")
+    AUTOHAND_NO_BANNER: str | None = Field(
+        None, description="Suppress startup banner ('1' to suppress)"
+    )
+    AUTOHAND_NON_INTERACTIVE: str | None = Field(
+        None, description="Force non-interactive mode ('1' to enable)"
+    )
+    AUTOHAND_PERMISSION_CALLBACK_TIMEOUT: str | None = Field(
+        None, description="Permission callback timeout in milliseconds"
+    )
+    AUTOHAND_PERMISSION_CALLBACK_URL: str | None = Field(
+        None, description="Permission callback URL for external approval"
+    )
+    AUTOHAND_SECRET: str | None = Field(
+        None, description="Company/enterprise secret for team features"
+    )
     AUTOHAND_SHARE_URL: str | None = Field(None, description="Share API URL override")
-    AUTOHAND_SKIP_PING: str | None = Field(None, description="Skip telemetry ping on startup ('1' to skip)")
-    AUTOHAND_SKIP_UPDATE_CHECK: str | None = Field(None, description="Skip version check on startup ('1' to skip)")
-    AUTOHAND_STREAM_TOOL_OUTPUT: str | None = Field(None, description="Stream tool output in real-time ('1' to enable)")
-    AUTOHAND_TERMINAL_REGIONS: str | None = Field(None, description="Disable terminal regions for box drawing ('0' to disable)")
-    AUTOHAND_THINKING_LEVEL: str | None = Field(None, description="Default thinking level (low, medium, high)")
-    AUTOHAND_TMUX_LAUNCHED: str | None = Field(None, description="TMUX session indicator ('1' when launched from tmux)")
-    AUTOHAND_YES: str | None = Field(None, description="Auto-confirm prompts without user interaction ('1' to enable)")
+    AUTOHAND_SKIP_PING: str | None = Field(
+        None, description="Skip telemetry ping on startup ('1' to skip)"
+    )
+    AUTOHAND_SKIP_UPDATE_CHECK: str | None = Field(
+        None, description="Skip version check on startup ('1' to skip)"
+    )
+    AUTOHAND_STREAM_TOOL_OUTPUT: str | None = Field(
+        None, description="Stream tool output in real-time ('1' to enable)"
+    )
+    AUTOHAND_TERMINAL_REGIONS: str | None = Field(
+        None, description="Disable terminal regions for box drawing ('0' to disable)"
+    )
+    AUTOHAND_THINKING_LEVEL: str | None = Field(
+        None, description="Default thinking level (low, medium, high)"
+    )
+    AUTOHAND_TMUX_LAUNCHED: str | None = Field(
+        None, description="TMUX session indicator ('1' when launched from tmux)"
+    )
+    AUTOHAND_YES: str | None = Field(
+        None, description="Auto-confirm prompts without user interaction ('1' to enable)"
+    )
 
 
 def detect_provider_from_model(model: str) -> ProviderName | None:
@@ -171,7 +205,9 @@ def validate_provider_config(provider: ProviderName, config: SDKConfig) -> None:
         if not config.azure_resource_name:
             raise ProviderConfigError("Azure provider requires 'azure_resource_name' configuration")
         if not config.azure_deployment_name:
-            raise ProviderConfigError("Azure provider requires 'azure_deployment_name' configuration")
+            raise ProviderConfigError(
+                "Azure provider requires 'azure_deployment_name' configuration"
+            )
 
     elif provider == ProviderName.OPENAI:
         if config.openai_auth_mode == "api-key" and not config.api_key:
@@ -212,9 +248,13 @@ class SkillSettings(BaseModel):
     """Skill settings for SDK configuration."""
 
     auto_skill: bool | None = Field(None, description="Enable automatic skill selection")
-    skills: list[SkillReference] = Field(default_factory=list, description="Specific skills to load (by name or file path)")
+    skills: list[SkillReference] = Field(
+        default_factory=list, description="Specific skills to load (by name or file path)"
+    )
     sources: list[SkillSource] = Field(default_factory=list, description="Skill sources to search")
-    install_missing: bool | None = Field(None, description="Whether to install missing skills from community")
+    install_missing: bool | None = Field(
+        None, description="Whether to install missing skills from community"
+    )
 
 
 def is_skill_file_path(ref: SkillReference) -> bool:
@@ -326,8 +366,12 @@ class ContextSettings(BaseModel):
 
     context_compact: bool | None = Field(None, description="Enable context compaction")
     max_tokens: int | None = Field(None, description="Maximum context window in tokens", gt=0)
-    compression_threshold: float | None = Field(None, description="Threshold for starting compression (0-1)", ge=0, le=1)
-    summarization_threshold: float | None = Field(None, description="Threshold for starting summarization (0-1)", ge=0, le=1)
+    compression_threshold: float | None = Field(
+        None, description="Threshold for starting compression (0-1)", ge=0, le=1
+    )
+    summarization_threshold: float | None = Field(
+        None, description="Threshold for starting summarization (0-1)", ge=0, le=1
+    )
 
 
 # =============================================================================
@@ -397,7 +441,9 @@ class AgentsMdSettings(BaseModel):
     enable: bool | None = Field(None, description="Enable AGENTS.md usage")
     create: bool | None = Field(None, description="Create AGENTS.md if it doesn't exist")
     path: str | None = Field(None, description="Path to AGENTS.md")
-    auto_update: bool | None = Field(None, description="Auto-update AGENTS.md with discovered patterns")
+    auto_update: bool | None = Field(
+        None, description="Auto-update AGENTS.md with discovered patterns"
+    )
     include_tools: bool | None = Field(None, description="Include tools in AGENTS.md")
     include_commands: bool | None = Field(None, description="Include commands in AGENTS.md")
     include_skills: bool | None = Field(None, description="Include skills in AGENTS.md")
@@ -477,10 +523,123 @@ class AccountInfo(BaseModel):
 class McpServerConfig(BaseModel):
     """Configuration for an MCP server."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str
+    transport: Literal["stdio", "sse", "http"] | None = None
     command: str | None = None
     args: list[str] = Field(default_factory=list)
+    url: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
+    auto_connect: bool | None = Field(None, alias="autoConnect")
+
+
+class CommunitySkill(BaseModel):
+    """A skill published in the CLI community registry."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    name: str
+    description: str
+    category: str
+    tags: list[str] | None = None
+    rating: float | None = None
+    download_count: int | None = Field(None, alias="downloadCount")
+    is_featured: bool | None = Field(None, alias="isFeatured")
+    is_curated: bool | None = Field(None, alias="isCurated")
+
+
+class SkillRegistryCategory(BaseModel):
+    """A registry category and the number of matching skills."""
+
+    name: str
+    count: int
+
+
+class GetSkillsRegistryParams(BaseModel):
+    """Parameters for retrieving the community skill registry."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    force_refresh: bool | None = Field(None, alias="forceRefresh")
+
+
+class GetSkillsRegistryResult(BaseModel):
+    """Typed result from ``autohand.getSkillsRegistry``."""
+
+    success: bool
+    skills: list[CommunitySkill]
+    categories: list[SkillRegistryCategory]
+    error: str | None = None
+
+
+class InstallSkillParams(BaseModel):
+    """Parameters for installing one registry skill."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    skill_name: str = Field(..., alias="skillName")
+    scope: Literal["user", "project"]
+    force: bool | None = None
+
+
+class InstallSkillResult(BaseModel):
+    """Typed result from ``autohand.installSkill``."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    success: bool
+    skill_name: str | None = Field(None, alias="skillName")
+    path: str | None = None
+    error: str | None = None
+
+
+class McpServerSummary(BaseModel):
+    """Connection status for one known MCP server."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    status: str
+    tool_count: int = Field(..., alias="toolCount")
+
+
+class McpListServersResult(BaseModel):
+    """Typed result from ``autohand.mcp.listServers``."""
+
+    servers: list[McpServerSummary]
+
+
+class McpListToolsParams(BaseModel):
+    """Optional server filter for MCP tool discovery."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    server_name: str | None = Field(None, alias="serverName")
+
+
+class McpToolInfo(BaseModel):
+    """A tool exposed by an MCP server."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str
+    description: str
+    server_name: str = Field(..., alias="serverName")
+
+
+class McpListToolsResult(BaseModel):
+    """Typed result from ``autohand.mcp.listTools``."""
+
+    tools: list[McpToolInfo]
+
+
+class McpGetServerConfigsResult(BaseModel):
+    """Typed result from ``autohand.mcp.getServerConfigs``."""
+
+    configs: list[McpServerConfig]
 
 
 # =============================================================================
@@ -1190,7 +1349,9 @@ class PromptParams(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     message: str = Field(..., description="The message to send to the agent")
-    context: dict[str, Any] | None = Field(None, description="Optional context including files and selection")
+    context: dict[str, Any] | None = Field(
+        None, description="Optional context including files and selection"
+    )
     images: list[dict[str, Any]] | None = Field(None, description="Optional image attachments")
     thinking_level: Literal["none", "normal", "extended"] | None = Field(
         None,
@@ -1310,46 +1471,75 @@ class SDKConfig(BaseModel):
     )
 
     # Basic Configuration
-    cwd: str | None = Field(None, description="Working directory for the CLI (defaults to current directory)")
-    cli_path: str | None = Field(None, description="Path to CLI binary (auto-detected if not provided)")
+    cwd: str | None = Field(
+        None, description="Working directory for the CLI (defaults to current directory)"
+    )
+    cli_path: str | None = Field(
+        None, description="Path to CLI binary (auto-detected if not provided)"
+    )
     debug: bool | None = Field(None, description="Enable debug logging")
-    timeout: int | None = Field(None, description="Timeout for requests in milliseconds (default: 300000)", gt=0)
-    startup_check: bool = Field(True, description="Probe the CLI with getState after subprocess startup")
+    timeout: int | None = Field(
+        None, description="Timeout for requests in milliseconds (default: 300000)", gt=0
+    )
+    startup_check: bool = Field(
+        True, description="Probe the CLI with getState after subprocess startup"
+    )
+    plan_mode: bool | None = Field(None, description="Enable or disable plan mode after startup")
 
     # Provider Configuration
-    model: str | None = Field(None, description="Model to use (provider is auto-detected from model ID)")
+    model: str | None = Field(
+        None, description="Model to use (provider is auto-detected from model ID)"
+    )
     fallback_model: str | None = Field(None, description="Fallback model if primary fails")
     max_turns: int | None = Field(None, description="Maximum number of turns", gt=0)
     max_budget_usd: float | None = Field(None, description="Maximum budget in USD", ge=0)
-    temperature: float | None = Field(None, description="Sampling temperature (0.0 to 2.0)", ge=0.0, le=2.0)
+    temperature: float | None = Field(
+        None, description="Sampling temperature (0.0 to 2.0)", ge=0.0, le=2.0
+    )
 
     # Provider-specific settings
-    provider: ProviderName | None = Field(None, description="Provider name (if not provided, auto-detected from model ID)")
+    provider: ProviderName | None = Field(
+        None, description="Provider name (if not provided, auto-detected from model ID)"
+    )
     api_key: str | None = Field(None, description="API key for the provider")
     base_url: str | None = Field(None, description="Base URL for the provider API")
-    autohand_ai_plan: Literal["cloud", "local"] | None = Field(None, description="Autohand AI plan style")
+    autohand_ai_plan: Literal["cloud", "local"] | None = Field(
+        None, description="Autohand AI plan style"
+    )
 
     # OpenAI-specific options
-    openai_auth_mode: Literal["api-key", "chatgpt"] | None = Field(None, description="OpenAI authentication mode")
-    reasoning_effort: Literal["low", "medium", "high"] | None = Field(None, description="OpenAI reasoning effort level (for o1 models)")
+    openai_auth_mode: Literal["api-key", "chatgpt"] | None = Field(
+        None, description="OpenAI authentication mode"
+    )
+    reasoning_effort: Literal["low", "medium", "high"] | None = Field(
+        None, description="OpenAI reasoning effort level (for o1 models)"
+    )
     chatgpt_access_token: str | None = Field(None, description="OpenAI ChatGPT access token")
     chatgpt_account_id: str | None = Field(None, description="OpenAI ChatGPT account ID")
 
     # Azure-specific options
-    azure_auth_method: Literal["api-key", "entra-id", "managed-identity"] | None = Field(None, description="Azure authentication method")
+    azure_auth_method: Literal["api-key", "entra-id", "managed-identity"] | None = Field(
+        None, description="Azure authentication method"
+    )
     azure_tenant_id: str | None = Field(None, description="Azure tenant ID (for entra-id auth)")
     azure_client_id: str | None = Field(None, description="Azure client ID (for entra-id auth)")
-    azure_client_secret: str | None = Field(None, description="Azure client secret (for entra-id auth)")
+    azure_client_secret: str | None = Field(
+        None, description="Azure client secret (for entra-id auth)"
+    )
     azure_resource_name: str | None = Field(None, description="Azure resource name")
     azure_deployment_name: str | None = Field(None, description="Azure deployment name")
 
     # Execution settings
     auto_mode: bool | None = Field(None, description="Enable auto-mode for autonomous execution")
     unrestricted: bool | None = Field(None, description="Run in unrestricted mode")
-    auto_commit: bool | None = Field(None, description="Enable auto-commit with an LLM-generated message")
+    auto_commit: bool | None = Field(
+        None, description="Enable auto-commit with an LLM-generated message"
+    )
     bare: bool | None = Field(None, description="Start the minimal explicit runtime")
     idle_logout: bool | None = Field(None, description="Keep authenticated idle logout enabled")
-    max_iterations: int | None = Field(None, description="Maximum number of iterations in auto-mode", gt=0)
+    max_iterations: int | None = Field(
+        None, description="Maximum number of iterations in auto-mode", gt=0
+    )
     max_runtime: int | None = Field(None, description="Maximum runtime in minutes", gt=0)
     max_cost: float | None = Field(None, description="Maximum API cost in dollars", ge=0)
 
@@ -1357,27 +1547,41 @@ class SDKConfig(BaseModel):
     sys_prompt: str | None = Field(None, description="System prompt (inline string or file path)")
     system_prompt_file: str | None = Field(None, description="File that replaces the system prompt")
     append_sys_prompt: str | None = Field(None, description="Append to system prompt")
-    append_system_prompt_file: str | None = Field(None, description="File appended to the system prompt")
+    append_system_prompt_file: str | None = Field(
+        None, description="File appended to the system prompt"
+    )
 
     # YOLO (auto-approve) settings
     yolo: str | None = Field(None, description="Auto-approve tool calls matching pattern")
-    yolo_timeout: int | None = Field(None, description="Timeout in seconds for auto-approve mode", gt=0)
+    yolo_timeout: int | None = Field(
+        None, description="Timeout in seconds for auto-approve mode", gt=0
+    )
 
     # Additional directories
-    additional_directories: list[str] | None = Field(None, description="Additional directories to add to workspace")
+    additional_directories: list[str] | None = Field(
+        None, description="Additional directories to add to workspace"
+    )
     add_dir: list[str] | None = Field(None, description="Additional directories (alias)")
 
     # Extra CLI arguments
     extra_args: list[str] | None = Field(None, description="Additional CLI arguments")
 
     # Environment variables
-    env_vars: AutohandEnvVars | None = Field(None, description="Environment variables to forward to CLI subprocess")
+    env_vars: AutohandEnvVars | None = Field(
+        None, description="Environment variables to forward to CLI subprocess"
+    )
 
     # Skills configuration
     skills: SkillSettings | None = Field(None, description="Skill settings")
-    skill_refs: list[SkillReference] | None = Field(None, description="Direct skill references (convenience)")
-    auto_skill: bool | None = Field(None, description="Enable auto-skill for automatic skill selection (legacy)")
-    copy_skill_files: bool = Field(True, description="Copy local skill files into ~/.autohand/skills before startup")
+    skill_refs: list[SkillReference] | None = Field(
+        None, description="Direct skill references (convenience)"
+    )
+    auto_skill: bool | None = Field(
+        None, description="Enable auto-skill for automatic skill selection (legacy)"
+    )
+    copy_skill_files: bool = Field(
+        True, description="Copy local skill files into ~/.autohand/skills before startup"
+    )
 
     # Permissions configuration
     permissions: PermissionSettings | None = Field(None, description="Permission settings")
@@ -1392,7 +1596,9 @@ class SDKConfig(BaseModel):
     persist_session: bool | None = Field(None, description="Persist session to disk (legacy)")
     session_id: str | None = Field(None, description="Session ID to resume (legacy)")
     resume: bool | None = Field(None, description="Resume from last session (legacy)")
-    continue_: bool | None = Field(None, alias="continue", description="Continue from last session (legacy)")
+    continue_: bool | None = Field(
+        None, alias="continue", description="Continue from last session (legacy)"
+    )
     fork: str | None = Field(None, description="Fork an existing session before startup")
 
     # Runtime integration configuration
@@ -1400,12 +1606,16 @@ class SDKConfig(BaseModel):
     mcp_config: str | None = Field(None, description="Explicit MCP config file")
     agents: str | None = Field(None, description="Inline agents JSON or external agents directory")
     plugin_dir: str | None = Field(None, description="Explicit plugin or meta-tool directory")
-    features: FeatureFlagSettings | None = Field(None, description="CLI feature settings applied at startup")
+    features: FeatureFlagSettings | None = Field(
+        None, description="CLI feature settings applied at startup"
+    )
 
     # AGENTS.md configuration
     agents_md: AgentsMdSettings | None = Field(None, description="AGENTS.md settings")
     agents_md_enable: bool | None = Field(None, description="Enable AGENTS.md usage (legacy)")
-    agents_md_create: bool | None = Field(None, description="Create AGENTS.md if it doesn't exist (legacy)")
+    agents_md_create: bool | None = Field(
+        None, description="Create AGENTS.md if it doesn't exist (legacy)"
+    )
 
     # Port for local provider
     port: int | None = Field(None, description="Port for local provider")

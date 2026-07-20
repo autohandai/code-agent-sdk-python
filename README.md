@@ -26,6 +26,8 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 - **Async/await native** - First-class support for async programming
 - **Type-safe** - Full type hints with Pydantic models
 - **Skill support** - Configure skills by name or file path
+- **Skill discovery** - Search the community registry and install skills with typed results
+- **MCP discovery** - List servers, tools, and server configurations through typed APIs
 - **Event streaming** - Real-time JSON-RPC notifications from the agent
 - **Typed event parsing** - Optional Pydantic parsing for known event types
 - **Replayable autoresearch** - Typed lifecycle, history, replay, rescore, compare, Pareto, pin, and prune APIs
@@ -111,6 +113,29 @@ The SDK automatically:
 
 Set `copy_skill_files=False` if you only want to activate skills that are
 already installed and do not want startup to write into `~/.autohand/skills`.
+Assign `sdk.skills` only before `start()`. Changing it while the SDK is running
+raises `RuntimeError`; stop the SDK first so the live CLI subprocess remains
+owned and is not replaced.
+
+Discover and install skills at runtime:
+
+```python
+registry = await sdk.get_skills_registry(force_refresh=False)
+for skill in registry.skills:
+    print(skill.name, skill.download_count)
+
+installed = await sdk.install_skill("typescript", scope="project")
+if not installed.success:
+    raise RuntimeError(installed.error)
+```
+
+MCP discovery uses the same typed style:
+
+```python
+servers = await sdk.list_mcp_servers()
+tools = await sdk.list_mcp_tools(server_name="github")
+configs = await sdk.get_mcp_server_configs()
+```
 
 ## Configuration
 
@@ -197,6 +222,9 @@ Main SDK class for interacting with the Autohand CLI.
 - `abort(reason=None)` - Abort current operation
 - `get_state()` - Get current agent state
 - `get_messages(limit=None, before=None)` - Get messages
+- `get_skills_registry(force_refresh=None)` / `install_skill(...)` - Discover and install skills
+- `list_mcp_servers()` / `list_mcp_tools(...)` / `get_mcp_server_configs()` - Inspect MCP integrations
+- `set_plan_mode(enabled)` - Change plan mode for the live session
 - `set_model(model)` - Change the model
 - `set_temperature(temperature)` - Set temperature
 - `get_account_info()` - Get account information
@@ -205,10 +233,29 @@ Main SDK class for interacting with the Autohand CLI.
 - `compare_autoresearch(...)` / `get_autoresearch_pareto()` - Analyze candidate quality
 - `pin_autoresearch(...)` / `prune_autoresearch(...)` - Manage retained candidate artifacts
 
+Prompt RPC responses are acknowledgements, so `stream_prompt()` stays open
+through the terminal `agent_end` notification. Closing an iterator early sends
+an abort and drains that turn; a CLI that cannot settle within two seconds is
+retired before another prompt can use the transport. Event queues are bounded
+at 1,024 entries per consumer.
+
+## Startup performance gate
+
+The repository gates cold public import, public `start()`, and fixture
+spawn-to-first-`getState` p95 latency below 50 ms. Interpreter boot is excluded
+from the import metric; provider/network readiness is environment-dependent.
+The command emits stable JSON with top-level `language`, `budgetMs`, `metrics`,
+and `passed`. Each metric contains `samples`, `medianMs`, `p95Ms`, `maxMs`, and
+its own `passed` result.
+
+```bash
+uv run python benchmarks/startup.py
+```
+
 #### Properties
 
 - `config` - Current SDK configuration
-- `skills` - Get/set skill references
+- `skills` - Get/set skill references before `start()`
 
 ### Events
 

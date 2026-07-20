@@ -57,3 +57,12 @@ asyncio.run(main())
 - [SDLC Workflows](./sdlc-workflows.md)
 - [Replayable Autoresearch](./autoresearch.md)
 - [Examples](./examples/README.md)
+
+## Maintainer startup gate
+
+Run `uv run python benchmarks/startup.py` to enforce the 5-warmup,
+50-sample p95 <50 ms gates for cold public import, public SDK start, and fixture
+spawn through the first successful `autohand.getState` response.
+The JSON contract reports `language`, `budgetMs`, nested `metrics`, and overall
+`passed`; every metric includes `samples`, `medianMs`, `p95Ms`, `maxMs`, and
+`passed`.

@@ -25,6 +25,7 @@ Common keyword arguments:
 - `debug`: enable SDK/transport debug logging.
 - `timeout`: JSON-RPC request timeout in milliseconds. Default is `300000`.
 - `startup_check`: probe the CLI with `autohand.getState` after subprocess startup. Default is `True`.
+- `plan_mode`: enable or disable CLI plan mode immediately after startup.
 - `model`: model identifier.
 - `fallback_model`: fallback model if the CLI/provider supports fallback behavior.
 - `temperature`: sampling temperature, `0.0` through `2.0`.
@@ -55,6 +56,10 @@ Common keyword arguments:
 - `copy_skill_files`: copy local skill files into `~/.autohand/skills` before startup. Default is `True`.
 - `env_vars`: `AutohandEnvVars` or a dictionary of `AUTOHAND_` variables forwarded to the subprocess.
 - `extra_args`: additional CLI arguments.
+
+The `sdk.skills` property may be assigned before `start()`. Assignment while
+the SDK is running raises `RuntimeError`; call `stop()` before changing the
+skill set. This preserves ownership of the current CLI subprocess.
 
 The constructor accepts either a `SDKConfig` instance or keyword arguments:
 
@@ -103,7 +108,11 @@ await sdk.start()
 ```
 
 Starts the CLI subprocess in JSON-RPC mode. Calling `start()` more than once is
-safe.
+safe, and concurrent calls coalesce around one subprocess. If the CLI closes its
+RPC stdout unexpectedly, both the client and public SDK transition back to a
+stopped state; calling `start()` on the same SDK instance creates a fresh process
+generation. A closure that races the final plan-mode or feature-settings response
+causes `start()` to fail instead of exposing a stale started state.
 
 ### stop
 
@@ -129,6 +138,31 @@ async with AutohandSDK(cwd=".") as sdk:
         ...
 ```
 
+## Skill registry and MCP discovery
+
+These methods use exact lower-camel-case CLI payloads and return Pydantic
+models with snake_case Python fields:
+
+| Method | Result model | RPC method |
+| --- | --- | --- |
+| `get_skills_registry(force_refresh=None)` | `GetSkillsRegistryResult` | `autohand.getSkillsRegistry` |
+| `install_skill(skill_name, scope, force=None)` | `InstallSkillResult` | `autohand.installSkill` |
+| `list_mcp_servers()` | `McpListServersResult` | `autohand.mcp.listServers` |
+| `list_mcp_tools(server_name=None)` | `McpListToolsResult` | `autohand.mcp.listTools` |
+| `get_mcp_server_configs()` | `McpGetServerConfigsResult` | `autohand.mcp.getServerConfigs` |
+
+`scope` is typed as `"user" | "project"`. Optional arguments are omitted
+from the wire payload when not provided. A valid `{success: false}` install or
+registry response remains a typed result; JSON-RPC errors raise `RPCError`.
+
+```python
+registry = await sdk.get_skills_registry()
+installed = await sdk.install_skill("typescript", "project", force=True)
+github_tools = await sdk.list_mcp_tools("github")
+```
+
+`Agent` exposes the same five methods and delegates to its owned SDK session.
+
 ## Prompting
 
 ### stream_prompt
@@ -139,6 +173,15 @@ async for event in sdk.stream_prompt(message: str, **kwargs):
 ```
 
 Sends a prompt and yields event dictionaries as the CLI emits notifications.
+Each event subscriber receives its own copy; a prompt stream and an `events()`
+consumer do not steal notifications from one another.
+
+The CLI's `{success: true}` prompt response acknowledges that background work
+was accepted; it is not the completed prompt result. The iterator remains open
+until `agent_end`. If the caller closes the iterator early, the SDK sends
+`autohand.abort`, drains through that terminal event, and retires the transport
+if the CLI cannot settle within two seconds. This keeps late output from the
+abandoned turn out of the next prompt.
 
 Prompt keyword arguments map to the CLI RPC `autohand.prompt` params:
 
