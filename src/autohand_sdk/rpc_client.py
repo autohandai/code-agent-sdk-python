@@ -15,6 +15,7 @@ from autohand_sdk.types import (
     SkillReference,
     get_skill_name,
     get_skill_path,
+    parse_sdk_wire_event,
     validate_provider_config,
 )
 
@@ -90,6 +91,17 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.hook.postTool": "hook_post_tool",
     "autohand.hook.prePrompt": "hook_pre_prompt",
     "autohand.hook.postResponse": "hook_post_response",
+    "autohand.hook.sessionError": "hook_session_error",
+    "autohand.hook.stop": "hook_stop",
+    "autohand.hook.sessionStart": "hook_session_start",
+    "autohand.hook.sessionEnd": "hook_session_end",
+    "autohand.hook.subagentStop": "hook_subagent_stop",
+    "autohand.hook.permissionRequest": "hook_permission_request",
+    "autohand.hook.notification": "hook_notification",
+    "autohand.hook.contextCompacted": "hook_context_compacted",
+    "autohand.hook.contextOverflow": "hook_context_overflow",
+    "autohand.hook.contextWarning": "hook_context_warning",
+    "autohand.hook.contextCritical": "hook_context_critical",
     "autohand.mcp.invokeRequest": "mcp_invoke_request",
     "autohand.mcp.toolsChanged": "mcp_tools_changed",
     "autohand.learn.progress": "learn_progress",
@@ -148,6 +160,16 @@ CAMEL_TO_SNAKE_KEYS = {
     "filesModified": "files_modified",
     "mentionedFiles": "mentioned_files",
     "toolCallsCount": "tool_calls_count",
+    "sessionType": "session_type",
+    "subagentId": "subagent_id",
+    "subagentName": "subagent_name",
+    "subagentType": "subagent_type",
+    "notificationType": "notification_type",
+    "croppedCount": "cropped_count",
+    "usagePercent": "usage_percent",
+    "tokensBefore": "tokens_before",
+    "tokensAfter": "tokens_after",
+    "remainingTokens": "remaining_tokens",
 }
 
 EVENT_BACKLOG_LIMIT = 1_024
@@ -968,7 +990,19 @@ class RPCClient:
             )
             return
 
+        raw_params = {key: value for key, value in params.items() if key != "_method"}
         event = self._notification_to_event(event_type, params)
+        if method.startswith("autohand.hook.") and isinstance(
+            parse_sdk_wire_event(event_type, raw_params), dict
+        ):
+            self._publish_event(
+                {
+                    "type": "unknown_notification",
+                    "method": method,
+                    "params": raw_params,
+                }
+            )
+            return
         self._publish_event(event)
 
         if method == "autohand.turnEnd":

@@ -1218,7 +1218,7 @@ class HookPostToolEvent(StrictSDKEventModel):
     tool_name: str
     success: bool
     duration: int | float
-    output: Any | None = None
+    output: str | None = None
     timestamp: str
 
 
@@ -1239,6 +1239,133 @@ class HookPostResponseEvent(StrictSDKEventModel):
     tokens_usage_status: Literal["actual", "unavailable"] | None = None
     tool_calls_count: int
     duration: int | float
+    timestamp: str
+
+
+HookFileChangeType: TypeAlias = Literal["create", "modify", "delete"]
+HookTokenUsageStatus: TypeAlias = Literal["actual", "unavailable"]
+HookSessionStartType: TypeAlias = Literal["startup", "resume", "clear"]
+HookSessionEndReason: TypeAlias = Literal["quit", "clear", "exit", "error"]
+
+
+class HookFileModifiedEvent(StrictSDKEventModel):
+    """Hook notification emitted when a tool changes a file."""
+
+    type: Literal["file_modified"] = "file_modified"
+    file_path: str
+    change_type: HookFileChangeType
+    tool_id: str
+    timestamp: str
+
+
+class HookSessionErrorEvent(StrictSDKEventModel):
+    """Hook notification emitted when agent execution fails."""
+
+    type: Literal["hook_session_error"] = "hook_session_error"
+    error: str
+    code: str | None = None
+    context: dict[str, Any] | None = None
+    timestamp: str
+
+
+class HookStopEvent(StrictSDKEventModel):
+    """Hook notification emitted when an agent turn stops."""
+
+    type: Literal["hook_stop"] = "hook_stop"
+    tokens_used: int | float
+    tokens_usage_status: HookTokenUsageStatus | None = None
+    tool_calls_count: int | float
+    duration: int | float
+    timestamp: str
+
+
+class HookSessionStartEvent(StrictSDKEventModel):
+    """Hook notification emitted when a session begins."""
+
+    type: Literal["hook_session_start"] = "hook_session_start"
+    session_type: HookSessionStartType
+    timestamp: str
+
+
+class HookSessionEndEvent(StrictSDKEventModel):
+    """Hook notification emitted when a session ends."""
+
+    type: Literal["hook_session_end"] = "hook_session_end"
+    reason: HookSessionEndReason
+    duration: int | float
+    timestamp: str
+
+
+class HookSubagentStopEvent(StrictSDKEventModel):
+    """Hook notification emitted when a subagent finishes."""
+
+    type: Literal["hook_subagent_stop"] = "hook_subagent_stop"
+    subagent_id: str
+    subagent_name: str
+    subagent_type: str
+    success: bool
+    duration: int | float
+    error: str | None = None
+    timestamp: str
+
+
+class HookPermissionRequestEvent(StrictSDKEventModel):
+    """Hook notification emitted before a permission prompt is shown."""
+
+    type: Literal["hook_permission_request"] = "hook_permission_request"
+    tool: str
+    path: str | None = None
+    command: str | None = None
+    args: dict[str, Any] | None = None
+    timestamp: str
+
+
+class HookNotificationEvent(StrictSDKEventModel):
+    """Hook notification emitted when a user-facing notice is sent."""
+
+    type: Literal["hook_notification"] = "hook_notification"
+    notification_type: str
+    message: str
+    timestamp: str
+
+
+class HookContextCompactedEvent(StrictSDKEventModel):
+    """Hook notification emitted after context compaction."""
+
+    type: Literal["hook_context_compacted"] = "hook_context_compacted"
+    cropped_count: int = Field(ge=0)
+    summary: str | None = None
+    usage_percent: int | float = Field(ge=0, allow_inf_nan=False)
+    reason: str
+    timestamp: str
+
+
+class HookContextOverflowEvent(StrictSDKEventModel):
+    """Hook notification emitted when context overflow is resolved."""
+
+    type: Literal["hook_context_overflow"] = "hook_context_overflow"
+    tokens_before: int = Field(ge=0)
+    tokens_after: int = Field(ge=0)
+    cropped_count: int = Field(ge=0)
+    usage_percent: int | float = Field(ge=0, allow_inf_nan=False)
+    timestamp: str
+
+
+class HookContextWarningEvent(StrictSDKEventModel):
+    """Hook notification emitted at the context warning threshold."""
+
+    type: Literal["hook_context_warning"] = "hook_context_warning"
+    usage_percent: int | float = Field(ge=0, allow_inf_nan=False)
+    remaining_tokens: int = Field(ge=0)
+    timestamp: str
+
+
+class HookContextCriticalEvent(StrictSDKEventModel):
+    """Hook notification emitted at the context critical threshold."""
+
+    type: Literal["hook_context_critical"] = "hook_context_critical"
+    usage_percent: int | float = Field(ge=0, allow_inf_nan=False)
+    remaining_tokens: int = Field(ge=0)
     timestamp: str
 
 
@@ -1423,6 +1550,18 @@ TypedSDKEvent: TypeAlias = (
     | HookPostToolEvent
     | HookPrePromptEvent
     | HookPostResponseEvent
+    | HookFileModifiedEvent
+    | HookSessionErrorEvent
+    | HookStopEvent
+    | HookSessionStartEvent
+    | HookSessionEndEvent
+    | HookSubagentStopEvent
+    | HookPermissionRequestEvent
+    | HookNotificationEvent
+    | HookContextCompactedEvent
+    | HookContextOverflowEvent
+    | HookContextWarningEvent
+    | HookContextCriticalEvent
     | McpInvokeRequestEvent
     | McpToolsChangedEvent
     | LearnProgressEvent
@@ -1448,6 +1587,18 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "hook_post_tool": HookPostToolEvent,
     "hook_pre_prompt": HookPrePromptEvent,
     "hook_post_response": HookPostResponseEvent,
+    "file_modified": HookFileModifiedEvent,
+    "hook_session_error": HookSessionErrorEvent,
+    "hook_stop": HookStopEvent,
+    "hook_session_start": HookSessionStartEvent,
+    "hook_session_end": HookSessionEndEvent,
+    "hook_subagent_stop": HookSubagentStopEvent,
+    "hook_permission_request": HookPermissionRequestEvent,
+    "hook_notification": HookNotificationEvent,
+    "hook_context_compacted": HookContextCompactedEvent,
+    "hook_context_overflow": HookContextOverflowEvent,
+    "hook_context_warning": HookContextWarningEvent,
+    "hook_context_critical": HookContextCriticalEvent,
     "mcp_invoke_request": McpInvokeRequestEvent,
     "mcp_tools_changed": McpToolsChangedEvent,
     "learn_progress": LearnProgressEvent,
@@ -1483,6 +1634,19 @@ def parse_sdk_event(event: SDKEvent) -> TypedSDKEvent | SDKEvent:
         return cast(TypedSDKEvent, model.model_validate(event))
     except ValidationError:
         return event
+
+
+def parse_sdk_wire_event(event_type: str, params: SDKEvent) -> TypedSDKEvent | SDKEvent:
+    """Parse a CLI payload while requiring its canonical camelCase field aliases."""
+    model = EVENT_MODEL_BY_TYPE.get(event_type)
+    event = {**params, "type": event_type}
+    if model is None:
+        return event
+    for field_name, field in model.model_fields.items():
+        alias = field.alias or field_name
+        if alias != field_name and field_name in params:
+            return event
+    return parse_sdk_event(event)
 
 
 # =============================================================================

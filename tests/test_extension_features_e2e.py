@@ -16,14 +16,27 @@ from autohand_sdk import (
     AutomodeCompleteEvent,
     AutomodeErrorEvent,
     AutomodeIterationEvent,
+    HookContextCompactedEvent,
+    HookContextCriticalEvent,
+    HookContextOverflowEvent,
+    HookContextWarningEvent,
+    HookFileModifiedEvent,
+    HookNotificationEvent,
+    HookPermissionRequestEvent,
     HookPostResponseEvent,
     HookPostToolEvent,
     HookPrePromptEvent,
     HookPreToolEvent,
+    HookSessionEndEvent,
+    HookSessionErrorEvent,
+    HookSessionStartEvent,
+    HookStopEvent,
+    HookSubagentStopEvent,
     LearnProgressEvent,
     McpInvokeRequestEvent,
     McpToolsChangedEvent,
     SDKConfig,
+    parse_sdk_event,
 )
 
 T = TypeVar("T")
@@ -820,7 +833,11 @@ async def test_pre_tool_hook_event_preserves_malformed_fallback(tmp_path: Path) 
     cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
-    assert event["args"] == "a.py"
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
 
 
 @pytest.mark.asyncio
@@ -854,14 +871,19 @@ async def test_post_tool_hook_event_preserves_malformed_fallback(tmp_path: Path)
             "toolId": "tool-1",
             "toolName": "write_file",
             "success": True,
-            "duration": "fast",
+            "duration": 42,
+            "output": {"unexpected": "object"},
             "timestamp": "t1",
         },
     }
     cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
-    assert event["duration"] == "fast"
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
 
 
 @pytest.mark.asyncio
@@ -893,7 +915,11 @@ async def test_pre_prompt_hook_event_preserves_malformed_fallback(tmp_path: Path
     cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
-    assert event["mentioned_files"] == [42]
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
 
 
 @pytest.mark.asyncio
@@ -933,7 +959,348 @@ async def test_post_response_hook_event_preserves_malformed_fallback(tmp_path: P
     cli = _feature_cli(tmp_path, method="unused", params={}, result={}, notifications=[malformed])
     event = await _with_sdk(cli, _next_sdk_event)
     assert isinstance(event, dict)
-    assert event["tokens_usage_status"] == "estimated"
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
+
+
+ADDITIONAL_HOOK_CASES = [
+    (
+        "autohand.hook.fileModified",
+        HookFileModifiedEvent,
+        {"filePath": "src/sdk.py", "changeType": "modify", "toolId": "tool-1", "timestamp": "t1"},
+        {"filePath": "src/sdk.py", "changeType": "rename", "toolId": "tool-1", "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.sessionError",
+        HookSessionErrorEvent,
+        {
+            "error": "provider failed",
+            "code": "PROVIDER_ERROR",
+            "context": {"retryable": True},
+            "timestamp": "t1",
+        },
+        {"error": {"message": "provider failed"}, "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.stop",
+        HookStopEvent,
+        {
+            "tokensUsed": 42,
+            "tokensUsageStatus": "actual",
+            "toolCallsCount": 2,
+            "duration": 125,
+            "timestamp": "t1",
+        },
+        {
+            "tokensUsed": "42",
+            "tokensUsageStatus": "actual",
+            "toolCallsCount": 2,
+            "duration": 125,
+            "timestamp": "t1",
+        },
+    ),
+    (
+        "autohand.hook.sessionStart",
+        HookSessionStartEvent,
+        {"sessionType": "resume", "timestamp": "t1"},
+        {"sessionType": "fork", "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.sessionEnd",
+        HookSessionEndEvent,
+        {"reason": "quit", "duration": 250, "timestamp": "t1"},
+        {"reason": "timeout", "duration": 250, "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.subagentStop",
+        HookSubagentStopEvent,
+        {
+            "subagentId": "sub-1",
+            "subagentName": "reviewer",
+            "subagentType": "worker",
+            "success": True,
+            "duration": 75,
+            "error": "none",
+            "timestamp": "t1",
+        },
+        {
+            "subagentId": "sub-1",
+            "subagentName": "reviewer",
+            "subagentType": "worker",
+            "success": "yes",
+            "duration": 75,
+            "timestamp": "t1",
+        },
+    ),
+    (
+        "autohand.hook.permissionRequest",
+        HookPermissionRequestEvent,
+        {
+            "tool": "write_file",
+            "path": "src/sdk.py",
+            "command": "write",
+            "args": {"force": False},
+            "timestamp": "t1",
+        },
+        {"tool": "write_file", "args": "force", "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.notification",
+        HookNotificationEvent,
+        {"notificationType": "info", "message": "Finished", "timestamp": "t1"},
+        {"notificationType": 7, "message": "Finished", "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.contextCompacted",
+        HookContextCompactedEvent,
+        {
+            "croppedCount": 3,
+            "summary": "Earlier turns",
+            "usagePercent": 0.6125,
+            "reason": "threshold",
+            "timestamp": "t1",
+        },
+        {"croppedCount": "3", "usagePercent": 0.6125, "reason": "threshold", "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.contextOverflow",
+        HookContextOverflowEvent,
+        {
+            "tokensBefore": 12000,
+            "tokensAfter": 8000,
+            "croppedCount": 4,
+            "usagePercent": 1.05,
+            "timestamp": "t1",
+        },
+        {
+            "tokensBefore": "12000",
+            "tokensAfter": 8000,
+            "croppedCount": 4,
+            "usagePercent": 1.05,
+            "timestamp": "t1",
+        },
+    ),
+    (
+        "autohand.hook.contextWarning",
+        HookContextWarningEvent,
+        {"usagePercent": 0.805, "remainingTokens": 4096, "timestamp": "t1"},
+        {"usagePercent": -0.1, "remainingTokens": 4096, "timestamp": "t1"},
+    ),
+    (
+        "autohand.hook.contextCritical",
+        HookContextCriticalEvent,
+        {"usagePercent": 0.9575, "remainingTokens": 1024, "timestamp": "t1"},
+        {"usagePercent": 0.9575, "remainingTokens": "1024", "timestamp": "t1"},
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("method", "event_type", "params", "_malformed"), ADDITIONAL_HOOK_CASES)
+async def test_additional_hook_event_uses_spawned_cli(
+    tmp_path: Path,
+    method: str,
+    event_type: type,
+    params: dict[str, Any],
+    _malformed: dict[str, Any],
+) -> None:
+    """Every current hook method produces its dedicated public event model."""
+    notification = {"method": method, "params": params}
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+
+    event = await _with_sdk(cli, _next_sdk_event)
+
+    assert isinstance(event, event_type)
+    dumped = event.model_dump(by_alias=True, exclude_none=True)
+    assert dumped["type"] == event.type
+    assert {key: dumped[key] for key in params} == params
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("method", "_event_type", "_params", "malformed"), ADDITIONAL_HOOK_CASES)
+async def test_additional_malformed_hook_preserves_exact_wire_fallback(
+    tmp_path: Path,
+    method: str,
+    _event_type: type,
+    _params: dict[str, Any],
+    malformed: dict[str, Any],
+) -> None:
+    """Malformed known hooks retain their method and untouched wire params."""
+    notification = {"method": method, "params": malformed}
+    cli = _feature_cli(
+        tmp_path, method="unused", params={}, result={}, notifications=[notification]
+    )
+
+    event = await _with_sdk(cli, _next_sdk_event)
+
+    assert event == {"type": "unknown_notification", "method": method, "params": malformed}
+
+
+CONTEXT_NUMERIC_VALIDATION_CASES = (
+    [
+        (
+            "hook_context_compacted",
+            {
+                "croppedCount": 3,
+                "usagePercent": 0.6125,
+                "reason": "threshold",
+                "timestamp": "t1",
+            },
+            field,
+        )
+        for field in ("croppedCount", "usagePercent")
+    ]
+    + [
+        (
+            "hook_context_overflow",
+            {
+                "tokensBefore": 12000,
+                "tokensAfter": 8000,
+                "croppedCount": 4,
+                "usagePercent": 1.05,
+                "timestamp": "t1",
+            },
+            field,
+        )
+        for field in ("tokensBefore", "tokensAfter", "croppedCount", "usagePercent")
+    ]
+    + [
+        (
+            event_type,
+            {"usagePercent": 0.805, "remainingTokens": 4096, "timestamp": "t1"},
+            field,
+        )
+        for event_type in ("hook_context_warning", "hook_context_critical")
+        for field in ("usagePercent", "remainingTokens")
+    ]
+)
+
+CONTEXT_INTEGER_VALIDATION_CASES = (
+    [
+        (
+            "hook_context_compacted",
+            {
+                "croppedCount": 3,
+                "usagePercent": 0.6125,
+                "reason": "threshold",
+                "timestamp": "t1",
+            },
+            "croppedCount",
+        )
+    ]
+    + [
+        (
+            "hook_context_overflow",
+            {
+                "tokensBefore": 12000,
+                "tokensAfter": 8000,
+                "croppedCount": 4,
+                "usagePercent": 1.05,
+                "timestamp": "t1",
+            },
+            field,
+        )
+        for field in ("tokensBefore", "tokensAfter", "croppedCount")
+    ]
+    + [
+        (
+            event_type,
+            {"usagePercent": 0.805, "remainingTokens": 4096, "timestamp": "t1"},
+            "remainingTokens",
+        )
+        for event_type in ("hook_context_warning", "hook_context_critical")
+    ]
+)
+
+
+@pytest.mark.parametrize(("event_type", "params", "field"), CONTEXT_NUMERIC_VALIDATION_CASES)
+@pytest.mark.parametrize("invalid", [-1.0, float("inf"), float("-inf"), float("nan")])
+def test_context_hook_numeric_fields_reject_negative_and_non_finite_values(
+    event_type: str,
+    params: dict[str, Any],
+    field: str,
+    invalid: float,
+) -> None:
+    """Every context numeric field enforces the wire contract without an upper bound."""
+    malformed = {**params, field: invalid, "type": event_type}
+
+    assert isinstance(parse_sdk_event(malformed), dict)
+
+
+@pytest.mark.parametrize(("event_type", "params", "field"), CONTEXT_INTEGER_VALIDATION_CASES)
+def test_context_hook_integer_fields_reject_fractional_values(
+    event_type: str,
+    params: dict[str, Any],
+    field: str,
+) -> None:
+    """Context counts and token quantities reject fractional wire values."""
+    malformed = {**params, field: 0.5, "type": event_type}
+
+    assert isinstance(parse_sdk_event(malformed), dict)
+
+
+@pytest.mark.asyncio
+async def test_hook_validation_cannot_be_bypassed_with_a_duplicate_snake_case_key(
+    tmp_path: Path,
+) -> None:
+    """Validation uses untouched wire aliases before Python-friendly normalization."""
+    malformed = {
+        "method": "autohand.hook.contextWarning",
+        "params": {
+            "usagePercent": -0.1,
+            "usage_percent": 0.805,
+            "remainingTokens": 4096,
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path,
+        method="unused",
+        params={},
+        result={},
+        notifications=[malformed],
+    )
+
+    event = await _with_sdk(cli, _next_sdk_event)
+
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_hook_wire_validation_rejects_snake_case_only_payloads(tmp_path: Path) -> None:
+    """Python-friendly field names do not replace canonical JSON-RPC aliases."""
+    malformed = {
+        "method": "autohand.hook.contextWarning",
+        "params": {
+            "usage_percent": 0.805,
+            "remaining_tokens": 4096,
+            "timestamp": "t1",
+        },
+    }
+    cli = _feature_cli(
+        tmp_path,
+        method="unused",
+        params={},
+        result={},
+        notifications=[malformed],
+    )
+
+    event = await _with_sdk(cli, _next_sdk_event)
+
+    assert event == {
+        "type": "unknown_notification",
+        "method": malformed["method"],
+        "params": malformed["params"],
+    }
 
 
 @pytest.mark.asyncio
