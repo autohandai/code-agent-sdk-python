@@ -507,6 +507,14 @@ class Transport:
         """Dispatch a decoded JSON-RPC message."""
         if "id" in message:
             request_id = message["id"]
+            if request_id is None and isinstance(message.get("error"), dict):
+                error = TransportError(str(message["error"].get("message", "CLI startup failed")))
+                self._fail_pending_requests(error)
+                self._notify_termination(error)
+                if self._process is not None:
+                    self._running = False
+                    self._schedule_retirement(self._process, error)
+                return
             future = self._callbacks.get(request_id)
             if future and not future.done():
                 future.set_result(message)

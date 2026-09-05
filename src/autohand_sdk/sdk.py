@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
-from contextlib import suppress
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import aclosing, suppress
 from typing import Any, Literal, cast
 
 from autohand_sdk.errors import TransportError
@@ -285,13 +285,20 @@ class AutohandSDK:
         params = PromptParams(message=message, **kwargs)
         return self._stream_prompt(params)
 
-    async def _stream_prompt(self, params: PromptParams) -> AsyncIterator[SDKEvent]:
+    async def _stream_prompt(self, params: PromptParams) -> AsyncGenerator[SDKEvent, None]:
         """Internal implementation of prompt streaming."""
         if not self._client:
             raise RuntimeError("SDK not started")
 
-        async for event in self._client.prompt(params.model_dump(by_alias=True, exclude_none=True)):
-            yield event
+        wire = params.model_dump(by_alias=True, exclude_none=True)
+        stream = (
+            self._client.prompt(wire, stop_when=params.stop_when)
+            if params.stop_when
+            else self._client.prompt(wire)
+        )
+        async with aclosing(stream):
+            async for event in stream:
+                yield event
 
     async def events(self) -> AsyncIterator[TypedSDKEvent | SDKEvent]:
         """Stream typed CLI notifications with raw forward-compatible fallback."""

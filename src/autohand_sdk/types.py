@@ -6,11 +6,13 @@ the SDK, including configuration, events, and API parameters.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 MIN_TEMPERATURE = 0.0
 MAX_TEMPERATURE = 2.0
@@ -55,6 +57,12 @@ class AutohandEnvVars(BaseModel):
     AUTOHAND_HOME: str | None = Field(None, description="Base directory for all Autohand user data")
     AUTOHAND_API_URL: str | None = Field(
         None, description="API base URL for authentication and sync services"
+    )
+    AUTOHAND_AUTH_API_URL: str | None = Field(None, description="Authentication API base URL")
+    AUTOHAND_API_KEY: str | None = Field(None, description="Headless account API credential")
+    AUTOHAND_NO_IDLE_LOGOUT: str | None = Field(None, description="Disable idle session logout")
+    AUTOHAND_DISABLE_AUTO_REPORT: str | None = Field(
+        None, description="Disable automatic bug reporting"
     )
     AUTOHAND_CONFIG: str | None = Field(None, description="Config file path override")
     AUTOHAND_AI_API_KEY: str | None = Field(
@@ -1423,6 +1431,56 @@ class AgentStartEvent(BaseModel):
     timestamp: str | None = None
 
 
+class AgentStepToolCall(BaseModel):
+    """A tool call produced during a completed agent step."""
+
+    model_config = ConfigDict(strict=True)
+    id: str | None = None
+    tool: str
+    args: dict[str, object]
+
+
+class AgentStepToolResult(BaseModel):
+    """A tool result persisted before the host evaluates stop conditions."""
+
+    model_config = ConfigDict(strict=True)
+    tool: str
+    success: bool
+    output: str | None = None
+    error: str | None = None
+
+
+class AgentStep(BaseModel):
+    """Serializable record of one completed tool step."""
+
+    model_config = ConfigDict(populate_by_name=True, strict=True)
+    step_number: int = Field(..., alias="stepNumber", ge=1)
+    thought: str | None = None
+    tool_calls: list[AgentStepToolCall] = Field(..., alias="toolCalls")
+    tool_results: list[AgentStepToolResult] = Field(..., alias="toolResults")
+
+
+class StopConditionContext(BaseModel):
+    """Snapshot of ordered completed steps supplied to a host predicate."""
+
+    model_config = ConfigDict(frozen=True)
+    steps: tuple[AgentStep, ...]
+
+
+StopCondition: TypeAlias = Callable[[StopConditionContext], bool | Awaitable[bool]]
+StopWhen: TypeAlias = StopCondition | list[StopCondition] | tuple[StopCondition, ...]
+
+
+class StepEndEvent(BaseModel):
+    """Completed tool step awaiting a host decision when stop control is enabled."""
+
+    model_config = ConfigDict(populate_by_name=True, strict=True)
+    type: Literal["step_end"] = "step_end"
+    step_id: str = Field(..., alias="stepId", min_length=1)
+    step: AgentStep
+    timestamp: str
+
+
 class AgentEndEvent(BaseModel):
     """Event emitted when the agent ends."""
 
@@ -1567,6 +1625,7 @@ TypedSDKEvent: TypeAlias = (
     | LearnProgressEvent
     | AgentStartEvent
     | AgentEndEvent
+    | StepEndEvent
     | MessageUpdateEvent
     | MessageEndEvent
     | ToolStartEvent
@@ -1604,6 +1663,7 @@ EVENT_MODEL_BY_TYPE: dict[str, type[BaseModel]] = {
     "learn_progress": LearnProgressEvent,
     "agent_start": AgentStartEvent,
     "agent_end": AgentEndEvent,
+    "step_end": StepEndEvent,
     "message_update": MessageUpdateEvent,
     "message_end": MessageEndEvent,
     "tool_start": ToolStartEvent,
@@ -2186,6 +2246,22 @@ class PromptParams(BaseModel):
         alias="thinkingLevel",
         description="Optional thinking depth level",
     )
+    stop_when: SkipJsonSchema[StopWhen | None] = Field(
+        None,
+        alias="stopWhen",
+        exclude=True,
+        description="Host predicates evaluated after tool steps",
+    )
+
+
+class RunResult(BaseModel):
+    """Final text, terminal status, and replayable event trace of one run."""
+
+    id: str
+    status: Literal["completed", "aborted", "stopped"]
+    text: str
+    events: list[SDKEvent]
+    steps: list[AgentStep]
 
 
 class PromptResult(BaseModel):

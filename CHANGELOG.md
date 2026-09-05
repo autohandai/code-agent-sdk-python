@@ -4,6 +4,13 @@
 
 ### Added
 
+- Lazy `Agent.send/run/stream/json` runs with replayable events, repeatable results,
+  and cancellation scoped to an individual run.
+- Sync/async `stop_when` predicates, `is_step_count`, `has_tool_call`, validated
+  step models, and resumable stops after persisted tool results.
+- An opt-in actual CLI test with local authentication and Autohand AI HTTP mocks.
+- Authentication API URL, headless API credential, idle logout, and automatic
+  reporting environment settings.
 - Typed community skill registry lookup and skill installation APIs.
 - Typed MCP server, tool, and server-configuration discovery APIs.
 - Runtime and startup plan-mode support through `autohand.planModeSet`.
@@ -11,6 +18,10 @@
 
 ### Fixed
 
+- Preserve stopped, aborted, and failed turn reasons instead of reporting completion.
+- Fail prompt event overflow explicitly and settle pending predicates on abort.
+- Preserve null-ID RPC startup errors instead of hiding them behind stdout EOF.
+- Close underlying prompt generators before returning from early stream cleanup.
 - Detect the standard `autohand` executable on `PATH` before legacy platform binaries.
 - Preserve notifications for independent prompt and global event consumers.
 - Treat the prompt RPC's `{success: true}` response as acceptance and continue

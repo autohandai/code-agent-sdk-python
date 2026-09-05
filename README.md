@@ -24,6 +24,7 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 ## Features
 
 - **Async/await native** - First-class support for async programming
+- **Agent runs and step control** - Replayable events, JSON helpers, scoped abort, and resumable tool-step stops
 - **Type-safe** - Full type hints with Pydantic models
 - **Skill support** - Configure skills by name or file path
 - **Skill discovery** - Search the community registry and install skills with typed results
@@ -33,7 +34,7 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 - **Replayable autoresearch** - Typed lifecycle, history, replay, rescore, compare, Pareto, pin, and prune APIs
 - **Automatic cleanup** - Context manager support for resource management
 - **Production transport** - Response matching, notification routing, timeouts, and typed RPC errors
-- **90%+ test coverage** - Subprocess-backed transport and streaming tests
+- **85% coverage gate** - Subprocess-backed transport and streaming tests
 
 ## Installation
 
@@ -175,6 +176,7 @@ Full guides live in `docs/`:
 - `docs/memory.md` - CLI memory behavior through Python event streams.
 - `docs/sdlc-workflows.md` - discovery, gated implementation, and release-readiness flows.
 - `docs/autoresearch.md` - replayable `/autoresearch` lifecycle and experiment ledger.
+- [Runs and step control](docs/step-control.md) - `Agent.send/run/stream/json`, stop conditions, and continuation.
 
 ## Replayable Autoresearch
 

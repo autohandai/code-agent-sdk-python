@@ -390,8 +390,9 @@ async def test_event_backlog_transfers_once_and_live_subscriber_queue_is_bounded
     client._prompt_event_queue = prompt_queue
     for index in range(prompt_queue.maxsize + 25):
         client._publish_event({"type": "message_update", "index": index})
-    assert prompt_queue.qsize() == prompt_queue.maxsize
-    assert prompt_queue.get_nowait()["index"] == 25
+    assert prompt_queue.qsize() == 1
+    assert prompt_queue.get_nowait() is None
+    assert isinstance(client._prompt_error, TransportError)
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,14 @@ class TransportError(AutohandSDKError):
     """Raised when the CLI transport cannot send or receive RPC messages."""
 
 
+class StructuredOutputError(AutohandSDKError):
+    """Raised when agent output contains no valid JSON value."""
+
+    def __init__(self, raw_response: str) -> None:
+        super().__init__("Expected valid JSON output from the agent")
+        self.raw_response = raw_response
+
+
 class TransportNotStartedError(TransportError):
     """Raised when an RPC request is attempted before the transport starts."""
 

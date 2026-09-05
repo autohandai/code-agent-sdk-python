@@ -2,6 +2,20 @@
 
 Complete reference for the Python Autohand SDK.
 
+## Agent and Run
+
+`Agent.from_sdk(sdk)` wraps a started SDK; `await Agent.create(...)` creates one.
+`agent.send(message, **prompt_options)` returns a lazy `Run`. `await agent.run(...)`
+returns `RunResult`; `agent.stream(...)` streams events; `await agent.json(...)`
+parses JSON with optional `validate=Model.model_validate`.
+
+`Run.wait()` is repeatable, `Run.stream()` supports independent replaying
+subscribers, and `await Run.abort()` cancels only that run. Results include
+`id`, `status` (`completed`, `stopped`, or `aborted`), `text`, `events`, and `steps`.
+Both `Agent` prompt methods and `sdk.stream_prompt` accept `stop_when`, a predicate
+or sequence of predicates such as `is_step_count(3)` or `has_tool_call("read_file")`.
+See [Runs and step control](step-control.md) for lifecycle and error semantics.
+
 ## AutohandSDK
 
 Main async API for controlling the Autohand CLI.

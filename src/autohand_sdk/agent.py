@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+import json
+from collections.abc import AsyncIterator, Callable
+from typing import Any, Literal, TypeVar, overload
 
+from autohand_sdk.run import Run
 from autohand_sdk.sdk import AutohandSDK
 from autohand_sdk.types import (
     AutomodeCancelResult,
@@ -36,15 +39,20 @@ from autohand_sdk.types import (
     McpListToolsResult,
     McpSetVscodeToolsResult,
     PermissionAcknowledgedResult,
+    PromptParams,
     PromptResult,
     ResetResult,
+    RunResult,
     SDKConfig,
+    SDKEvent,
     SessionAttachResult,
     SetContextCompactResult,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
     YoloSetResult,
 )
+
+T = TypeVar("T")
 
 
 class Agent:
@@ -68,6 +76,70 @@ class Agent:
     def from_sdk(cls, sdk: AutohandSDK) -> Agent:
         """Wrap an existing low-level SDK instance."""
         return cls(sdk)
+
+    def send(self, message: str | PromptParams, **kwargs: Any) -> Run:
+        """Create a lazy run, preserving validated prompt options and host callbacks."""
+        # Extra keyword arguments are validated by PromptParams, including future
+        # wire fields; this mirrors the low-level stream_prompt API.
+        if isinstance(message, PromptParams):
+            values = {
+                **message.model_dump(exclude_none=True),
+                "stop_when": message.stop_when,
+                **kwargs,
+            }
+            params = PromptParams.model_validate(values)
+        else:
+            params = PromptParams(message=message, **kwargs)
+        return Run(self._sdk, params)
+
+    async def run(self, message: str | PromptParams, **kwargs: Any) -> RunResult:
+        """Send a prompt and wait for its final text, status, events, and steps."""
+        run = self.send(message, **kwargs)
+        try:
+            return await run.wait()
+        except BaseException:
+            await run.abort()
+            raise
+
+    async def stream(self, message: str | PromptParams, **kwargs: Any) -> AsyncIterator[SDKEvent]:
+        """Stream a prompt, aborting its run if this iterator is closed early."""
+        run = self.send(message, **kwargs)
+        try:
+            async for event in run.stream():
+                yield event
+        finally:
+            await run.abort()
+
+    @overload
+    async def json(self, message: str, *, validate: Callable[[object], T], **kwargs: Any) -> T: ...
+
+    @overload
+    async def json(self, message: str, *, validate: None = None, **kwargs: Any) -> object: ...
+
+    async def json(
+        self,
+        message: str,
+        *,
+        validate: Callable[[object], T] | None = None,
+        schema: object | None = None,
+        schema_name: str | None = None,
+        output_instructions: str | None = None,
+        **kwargs: Any,
+    ) -> T | object:
+        """Request JSON output and optionally validate the decoded value."""
+        instructions = ["Return only valid JSON, without Markdown or commentary."]
+        if schema_name:
+            instructions.append(f"The JSON value should satisfy: {schema_name}.")
+        if schema is not None:
+            instructions.append(f"Use this JSON schema or example shape:\n{json.dumps(schema)}")
+        if output_instructions:
+            instructions.append(output_instructions)
+        run = self.send(message + "\n\n" + "\n".join(instructions), **kwargs)
+        try:
+            return await run.json(validate=validate)
+        except BaseException:
+            await run.abort()
+            raise
 
     async def close(self) -> None:
         """Close the underlying SDK session."""

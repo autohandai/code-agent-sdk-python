@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import suppress
 from typing import Any, Literal, cast
 
 from autohand_sdk.errors import TransportError
 from autohand_sdk.transport import Transport, TransportOptions
 from autohand_sdk.types import (
+    AgentStep,
     SDKConfig,
     SkillReference,
+    StepEndEvent,
+    StopCondition,
+    StopConditionContext,
+    StopWhen,
     get_skill_name,
     get_skill_path,
     parse_sdk_wire_event,
@@ -23,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 RPC_METHODS = {
     "prompt": "autohand.prompt",
+    "step_decision": "autohand.stepDecision",
     "abort": "autohand.abort",
     "reset": "autohand.reset",
     "browser_handoff_create": "autohand.browserHandoff.create",
@@ -109,6 +116,7 @@ NOTIFICATION_EVENT_TYPES = {
     "autohand.agentEnd": "agent_end",
     "autohand.turnStart": "turn_start",
     "autohand.turnEnd": "turn_end",
+    "autohand.stepEnd": "step_end",
     "autohand.messageStart": "message_start",
     "autohand.messageUpdate": "message_update",
     "autohand.messageEnd": "message_end",
@@ -197,6 +205,7 @@ class RPCClient:
         self._event_subscribers: set[EventQueue] = set()
         self._event_streams_closed = False
         self._prompt_event_queue: EventQueue | None = None
+        self._prompt_error: TransportError | None = None
         self._prompt_lock = asyncio.Lock()
         self._lifecycle_lock = asyncio.Lock()
         self._termination_callback = termination_callback
@@ -254,15 +263,24 @@ class RPCClient:
         """
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_state"], config or {}))
 
-    async def prompt(self, params: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+    async def prompt(
+        self, params: dict[str, Any], *, stop_when: StopWhen | None = None
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """Send a prompt to the agent and stream SDK events."""
+        conditions = [stop_when] if callable(stop_when) else list(stop_when or ())
+        if conditions:
+            params = {**params, "stopWhen": {"mode": "host"}}
         async with self._prompt_lock:
             prompt_queue: EventQueue = asyncio.Queue(maxsize=EVENT_BACKLOG_LIMIT)
             self._prompt_event_queue = prompt_queue
+            self._prompt_error = None
+            steps: list[AgentStep] = []
+            decision_task: asyncio.Task[None] | None = None
             request_task: asyncio.Task[Any] | None = None
             get_event: asyncio.Task[dict[str, Any] | None] | None = None
             seen_events = False
             terminal_event_seen = False
+            terminal_reason: str | None = None
             request_result: Any = None
             request_acknowledged = False
             request_failed = False
@@ -270,71 +288,96 @@ class RPCClient:
                 request_task = asyncio.create_task(self._request(RPC_METHODS["prompt"], params))
 
                 while not terminal_event_seen:
-                    get_event = asyncio.create_task(prompt_queue.get())
+                    if get_event is None:
+                        get_event = asyncio.create_task(prompt_queue.get())
+                    # A host predicate can await permission/UI work while notifications
+                    # continue to flow. Never block the event pump on the callback.
+                    pending: set[asyncio.Task[Any]] = {get_event}
                     if not request_acknowledged:
-                        done, _ = await asyncio.wait(
-                            {request_task, get_event},
-                            return_when=asyncio.FIRST_COMPLETED,
-                        )
-                        if request_task in done:
-                            try:
-                                request_result = await request_task
-                            except BaseException:
-                                request_failed = True
-                                raise
-                            request_acknowledged = True
+                        pending.add(request_task)
+                    if decision_task is not None:
+                        pending.add(decision_task)
+                    done, _ = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                    if decision_task is not None and decision_task in done:
+                        await decision_task
+                        decision_task = None
+                    if not request_acknowledged and request_task in done:
+                        try:
+                            request_result = await request_task
+                        except BaseException:
+                            request_failed = True
+                            raise
+                        request_acknowledged = True
 
-                            if (
-                                not seen_events
-                                and isinstance(request_result, dict)
-                                and (
-                                    request_result.get("content") is not None
-                                    or request_result.get("sessionId") is not None
-                                    or request_result.get("session_id") is not None
-                                )
-                                and not get_event.done()
-                            ):
-                                get_event.cancel()
-                                with suppress(asyncio.CancelledError):
-                                    await get_event
-                                get_event = None
-                                session_id = (
-                                    request_result.get("sessionId")
-                                    or request_result.get("session_id")
-                                    or ""
-                                )
-                                yield {"type": "agent_start", "session_id": session_id}
-                                if request_result.get("content"):
-                                    yield {
-                                        "type": "message_end",
-                                        "content": request_result["content"],
-                                    }
+                        if (
+                            not seen_events
+                            and isinstance(request_result, dict)
+                            and (
+                                request_result.get("content") is not None
+                                or request_result.get("sessionId") is not None
+                                or request_result.get("session_id") is not None
+                            )
+                            and not get_event.done()
+                        ):
+                            get_event.cancel()
+                            with suppress(asyncio.CancelledError):
+                                await get_event
+                            get_event = None
+                            session_id = (
+                                request_result.get("sessionId")
+                                or request_result.get("session_id")
+                                or ""
+                            )
+                            yield {"type": "agent_start", "session_id": session_id}
+                            if request_result.get("content"):
                                 yield {
-                                    "type": "agent_end",
-                                    "session_id": session_id,
-                                    "reason": "completed",
+                                    "type": "message_end",
+                                    "content": request_result["content"],
                                 }
-                                seen_events = True
-                                terminal_event_seen = True
-                                break
+                            yield {
+                                "type": "agent_end",
+                                "session_id": session_id,
+                                "reason": "completed",
+                            }
+                            seen_events = True
+                            terminal_event_seen = True
+                            break
 
-                            if get_event not in done:
-                                get_event.cancel()
-                                with suppress(asyncio.CancelledError):
-                                    await get_event
-                                get_event = None
-                                continue
-                    else:
-                        await get_event
+                    if get_event not in done:
+                        continue
 
                     event = get_event.result()
                     get_event = None
                     if event is None:
-                        raise TransportError("Prompt event stream closed")
+                        raise self._prompt_error or TransportError("Prompt event stream closed")
+                    if event.get("type") == "step_end":
+                        step_event = StepEndEvent.model_validate(event)
+                        steps.append(step_event.step)
+                        if conditions:
+                            if decision_task is not None:
+                                await decision_task
+                            decision_task = asyncio.create_task(
+                                self._decide_step(step_event.step_id, steps, conditions)
+                            )
                     seen_events = True
                     terminal_event_seen = event.get("type") == "agent_end"
+                    if terminal_event_seen:
+                        terminal_reason = event.get("reason")
                     yield event
 
+                if decision_task is not None and terminal_reason in (
+                    "aborted",
+                    "error",
+                    "failed",
+                    "cancelled",
+                ):
+                    decision_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await decision_task
+                    decision_task = None
+                if decision_task is not None:
+                    await decision_task
+                    decision_task = None
                 if not request_acknowledged:
                     request_result = await request_task
                     request_acknowledged = True
@@ -353,6 +396,10 @@ class RPCClient:
                     }
             finally:
                 try:
+                    if decision_task is not None:
+                        decision_task.cancel()
+                        with suppress(asyncio.CancelledError, Exception):
+                            await decision_task
                     if get_event is not None and not get_event.done():
                         get_event.cancel()
                         with suppress(asyncio.CancelledError):
@@ -369,6 +416,41 @@ class RPCClient:
                 finally:
                     if self._prompt_event_queue is prompt_queue:
                         self._prompt_event_queue = None
+
+    async def step_decision(self, step_id: str, stop: bool) -> None:
+        """Resolve a pending tool step; reject malformed or unaccepted responses."""
+        if not step_id or not isinstance(stop, bool):
+            raise ValueError("step_decision requires a step ID and boolean stop decision")
+        result = await self._request(
+            RPC_METHODS["step_decision"], {"stepId": step_id, "stop": stop}
+        )
+        if not isinstance(result, dict) or result.get("success") is not True:
+            raise TransportError("autohand.stepDecision was rejected or returned an invalid result")
+
+    async def _decide_step(
+        self, step_id: str, steps: list[AgentStep], conditions: list[StopCondition]
+    ) -> None:
+        try:
+            stop = False
+            for condition in conditions:
+                context = StopConditionContext(
+                    steps=tuple(step.model_copy(deep=True) for step in steps)
+                )
+                decision = condition(context)
+                if inspect.isawaitable(decision):
+                    decision = await decision
+                if not isinstance(decision, bool):
+                    raise TypeError("stop_when predicates must return a boolean")
+                if decision:
+                    stop = True
+                    break
+        except Exception:
+            # Persisted tool results remain available for a later prompt. Cleanup
+            # in prompt() aborts/drains if this stop request cannot be accepted.
+            with suppress(Exception):
+                await self.step_decision(step_id, True)
+            raise
+        await self.step_decision(step_id, stop)
 
     async def _settle_abandoned_prompt(self, prompt_queue: EventQueue) -> None:
         """Abort an accepted background turn and wait for its terminal event."""
@@ -1010,7 +1092,11 @@ class RPCClient:
                 {
                     "type": "agent_end",
                     "session_id": event.get("session_id") or event.get("turn_id", ""),
-                    "reason": "completed",
+                    "reason": (
+                        "stopped"
+                        if event.get("reason") == "stop_condition"
+                        else event.get("reason") or "completed"
+                    ),
                     "timestamp": event.get("timestamp"),
                 }
             )
@@ -1022,7 +1108,15 @@ class RPCClient:
         if not self._event_subscribers:
             self._put_bounded(self._event_queue, event)
         if self._prompt_event_queue is not None:
-            self._put_bounded(self._prompt_event_queue, event)
+            queue = self._prompt_event_queue
+            if self._prompt_error is None:
+                if queue.full():
+                    self._prompt_error = TransportError("Prompt event backlog exceeded its limit")
+                    while not queue.empty():
+                        queue.get_nowait()
+                    queue.put_nowait(None)
+                else:
+                    queue.put_nowait(event)
         for queue in tuple(self._event_subscribers):
             self._put_bounded(queue, event)
 

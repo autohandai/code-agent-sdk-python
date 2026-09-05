@@ -43,10 +43,22 @@ __all__ = [
     # Main classes
     "AutohandSDK",
     "Agent",
+    "Run",
+    "RunResult",
+    "AgentStep",
+    "AgentStepToolCall",
+    "AgentStepToolResult",
+    "StepEndEvent",
+    "StopCondition",
+    "StopConditionContext",
+    "StopWhen",
+    "is_step_count",
+    "has_tool_call",
     "RPCClient",
     "Transport",
     "AutohandSDKError",
     "TransportError",
+    "StructuredOutputError",
     "TransportNotStartedError",
     "RPCError",
     "RequestTimeoutError",
@@ -272,6 +284,7 @@ __all__ = [
 ]
 
 _ERROR_EXPORTS = {
+    "StructuredOutputError",
     "AutohandSDKError",
     "RequestTimeoutError",
     "RPCError",
@@ -294,6 +307,9 @@ _EXPORT_MODULES = {
 _EXPORT_MODULES.update(
     {
         "Agent": "autohand_sdk.agent",
+        "Run": "autohand_sdk.run",
+        "is_step_count": "autohand_sdk.step_control",
+        "has_tool_call": "autohand_sdk.step_control",
         "AutohandSDK": "autohand_sdk.sdk",
         "RPCClient": "autohand_sdk.rpc_client",
         "Transport": "autohand_sdk.transport",
