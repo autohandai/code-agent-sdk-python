@@ -51,6 +51,9 @@ class AutohandEnvVars(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    AUTOHAND_PROVIDER: str | None = Field(
+        None, description="Process provider selection; explicit SDK provider takes precedence"
+    )
     AUTOHAND_DEBUG: str | None = Field(
         None, description="Enable debug logging mode ('1' to enable)"
     )

@@ -230,6 +230,8 @@ class Transport:
             if self.options.base_url:
                 env["AUTOHAND_AI_BASE_URL"] = self.options.base_url
         env.update(self.options.env_vars)
+        if self.options.provider is not None:
+            env["AUTOHAND_PROVIDER"] = self.options.provider
 
         self._stderr_lines.clear()
         process = await asyncio.create_subprocess_exec(

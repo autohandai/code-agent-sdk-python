@@ -86,7 +86,8 @@ async def test_current_harness_stop_resume(tmp_path: Path) -> None:
         json.dumps(
             {
                 "auth": {"token": "sdk-fixture-key"},
-                "provider": "autohandai",
+                "provider": "openrouter",
+                "openrouter": {"baseUrl": url + "/unused", "apiKey": "saved-provider-key"},
                 "autohandai": {
                     "model": "fantail",
                     "plan": "cloud",
@@ -132,6 +133,11 @@ async def test_current_harness_stop_resume(tmp_path: Path) -> None:
         assert result.status == "completed"
         assert len(calls) == 2
         assert "sdk-parity-evidence" in json.dumps(calls[1]["messages"])
+        saved = json.loads(config.read_text())
+        assert saved["provider"] == "openrouter"
+        assert saved["openrouter"]["apiKey"] == "saved-provider-key"
+        assert "apiKey" not in saved["autohandai"]
+        assert "baseUrl" not in saved["autohandai"]
     finally:
         if agent is not None:
             await agent.close()

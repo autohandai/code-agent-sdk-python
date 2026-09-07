@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from autohand_sdk.types import (
     AgentsMdSettings,
+    AutohandEnvVars,
     AutoresearchEvent,
     AutoresearchOperationEvent,
     AutoresearchRescoreParams,
@@ -25,6 +26,16 @@ from autohand_sdk.types import (
     parse_sdk_event,
     validate_provider_config,
 )
+
+
+def test_provider_environment_survives_typed_configuration() -> None:
+    """Preserve process selection when SDK configuration validates environment fields."""
+    env = AutohandEnvVars.model_validate({"AUTOHAND_PROVIDER": "extension:company-provider"})
+    config = SDKConfig(env_vars=env)
+    assert config.env_vars is not None
+    assert config.env_vars.model_dump(exclude_none=True) == {
+        "AUTOHAND_PROVIDER": "extension:company-provider"
+    }
 
 
 class TestProviderDetection:

@@ -318,6 +318,7 @@ class TestTransportStartArguments:
             "    'ai_key': os.environ.get('AUTOHAND_AI_API_KEY'),\n"
             "    'ai_base_url': os.environ.get('AUTOHAND_AI_BASE_URL'),\n"
             "    'ai_plan': os.environ.get('AUTOHAND_AI_PLAN'),\n"
+            "    'provider': os.environ.get('AUTOHAND_PROVIDER'),\n"
             "}))\n"
             "for _line in sys.stdin:\n"
             "    pass\n",
@@ -397,6 +398,7 @@ class TestTransportStartArguments:
         assert data["ai_key"] == "ah-test-key"
         assert data["ai_base_url"] == "https://api.example.test/v1"
         assert data["ai_plan"] == "cloud"
+        assert data["provider"] == "autohandai"
         assert argv[:2] == ["--mode", "rpc"]
         assert "--unrestricted" in argv
         assert "--auto-mode" in argv
