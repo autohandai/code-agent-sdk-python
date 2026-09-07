@@ -62,6 +62,7 @@ RPC_METHODS = {
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
     "get_supported_commands": "autohand.getSupportedCommands",
+    "get_supported_agents": "autohand.getSupportedAgents",
     "get_skills_registry": "autohand.getSkillsRegistry",
     "install_skill": "autohand.installSkill",
     "set_model": "autohand.modelSet",
@@ -733,6 +734,10 @@ class RPCClient:
     async def get_models(self) -> dict[str, Any]:
         """Get supported models."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_supported_models"], {}))
+
+    async def get_supported_agents(self) -> dict[str, Any]:
+        """Return effective subagent metadata from the running CLI."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["get_supported_agents"], {}))
 
     async def get_agents(self) -> dict[str, Any]:
         """Get supported command names.

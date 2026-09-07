@@ -274,6 +274,8 @@ __all__ = [
     # Model types
     "ModelInfo",
     "AgentInfo",
+    "SupportedAgentInfo",
+    "GetSupportedAgentsResult",
     "AccountInfo",
     "McpServerConfig",
     # Abort types

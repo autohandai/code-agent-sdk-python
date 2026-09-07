@@ -112,6 +112,64 @@ async def _next_sdk_event(sdk: AutohandSDK) -> Any:
 
 
 @pytest.mark.asyncio
+async def test_discovers_effective_agents(tmp_path: Path) -> None:
+    """Preserve effective model, tools, and extension provenance across the wire."""
+    agents = [
+        {
+            "id": "reviewer",
+            "name": "reviewer",
+            "description": "Review changes",
+            "tools": ["read_file"],
+            "model": "fantail",
+            "source": "extension",
+            "extensionId": "example.review",
+            "extensionVersion": "1.0.0",
+            "extensionScope": "project",
+        }
+    ]
+    cli = _feature_cli(
+        tmp_path, method="autohand.getSupportedAgents", params={}, result={"agents": agents}
+    )
+    result = await _with_sdk(cli, lambda sdk: sdk.supported_agents())
+    assert len(result) == 1
+    assert result[0].id == "reviewer"
+    assert result[0].tools == ["read_file"]
+    assert result[0].model == "fantail"
+    assert result[0].source == "extension"
+    assert result[0].extension_id == "example.review"
+    assert result[0].extension_version == "1.0.0"
+    assert result[0].extension_scope == "project"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "result",
+    [
+        {},
+        {"agents": None},
+        {"agents": [{}]},
+        {"agents": [{"id": "one", "name": "one", "description": "Agent", "tools": [1]}]},
+        {
+            "agents": [
+                {
+                    "id": "one",
+                    "name": "one",
+                    "description": "Agent",
+                    "tools": [],
+                    "extensionScope": "invalid",
+                }
+            ]
+        },
+    ],
+)
+async def test_rejects_malformed_agent_discovery(tmp_path: Path, result: object) -> None:
+    """Reject invalid registry data instead of reporting an empty registry."""
+    cli = _feature_cli(tmp_path, method="autohand.getSupportedAgents", params={}, result=result)
+    with pytest.raises(ValidationError):
+        await _with_sdk(cli, lambda sdk: sdk.supported_agents())
+
+
+@pytest.mark.asyncio
 async def test_permission_acknowledgement_uses_spawned_cli(tmp_path: Path) -> None:
     """The public SDK sends the exact acknowledgement and validates its result."""
     cli = _feature_cli(

@@ -523,6 +523,27 @@ class AgentInfo(BaseModel):
     version: str = "1.0.0"
 
 
+class SupportedAgentInfo(AgentInfo):
+    """An effective subagent returned by the running CLI registry."""
+
+    model_config = ConfigDict(populate_by_name=True, strict=True)
+
+    id: str
+    description: str
+    tools: list[str]
+    model: str | None = None
+    source: str | None = None
+    extension_id: str | None = Field(None, alias="extensionId")
+    extension_version: str | None = Field(None, alias="extensionVersion")
+    extension_scope: Literal["user", "project"] | None = Field(None, alias="extensionScope")
+
+
+class GetSupportedAgentsResult(BaseModel):
+    """The initialized session's effective agent registry."""
+
+    agents: list[SupportedAgentInfo]
+
+
 class AccountInfo(BaseModel):
     """Account information."""
 

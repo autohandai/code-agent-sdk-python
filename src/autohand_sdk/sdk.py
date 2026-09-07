@@ -68,6 +68,7 @@ from autohand_sdk.types import (
     GetSkillsRegistryResult,
     GetStateParams,
     GetStateResult,
+    GetSupportedAgentsResult,
     GetToolsRegistryResult,
     GoalFeatureDisabledResult,
     GoalMutationResult,
@@ -102,6 +103,7 @@ from autohand_sdk.types import (
     SetContextCompactParams,
     SetContextCompactResult,
     SkillReference,
+    SupportedAgentInfo,
     TypedSDKEvent,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
@@ -713,6 +715,13 @@ class AutohandSDK:
         result = await self._client.get_agents()
         agents = result.get("agents", result.get("commands", []))
         return cast(list[dict[str, Any]], agents)
+
+    async def supported_agents(self) -> list[SupportedAgentInfo]:
+        """Return effective subagents, including inline and enabled extension agents."""
+        if not self._started or not self._client:
+            raise RuntimeError("SDK not started")
+        result = await self._client.get_supported_agents()
+        return GetSupportedAgentsResult.model_validate(result).agents
 
     async def get_skills_registry(
         self,
