@@ -64,6 +64,7 @@ def _feature_cli(
         "#!/usr/bin/env python3\n"
         "import json, sys\n"
         f"fixture = json.loads({fixture!r})\n"
+        "startup_checked = False\n"
         "for line in sys.stdin:\n"
         "    request = json.loads(line)\n"
         "    if request.get('method') == 'autohand.getState':\n"
@@ -72,6 +73,9 @@ def _feature_cli(
         "            'workspace': '.', 'contextPercent': 0, 'messageCount': 0,\n"
         "        }}\n"
         "        print(json.dumps(response), flush=True)\n"
+        "        if not startup_checked:\n"
+        "            startup_checked = True\n"
+        "            continue\n"
         "        for notification in fixture['notifications']:\n"
         "            print(json.dumps({'jsonrpc': '2.0', **notification}), flush=True)\n"
         "        continue\n"
@@ -98,7 +102,7 @@ async def _with_sdk(
 
 
 async def _next_sdk_event(sdk: AutohandSDK) -> Any:
-    """Return one public event without leaving its subscriber open."""
+    """Trigger post-startup fixture events without leaving the subscriber open."""
     events = sdk.events()
     next_event = asyncio.create_task(anext(events))
     try:

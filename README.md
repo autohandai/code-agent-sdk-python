@@ -304,6 +304,10 @@ from autohand_sdk import RPCError, RequestTimeoutError, TransportNotStartedError
 
 ## Development
 
+GitHub CI runs the existing tests and coverage requirement on Python 3.10–3.14
+with locked uv dependencies, builds the wheel and source distribution, and uploads
+the package artifacts. Dependabot checks GitHub Actions versions weekly.
+
 Using uv for dependency management:
 
 ```bash
