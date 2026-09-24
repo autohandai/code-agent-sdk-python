@@ -276,6 +276,24 @@ __all__ = [
     "AgentInfo",
     "AccountInfo",
     "McpServerConfig",
+    # Weka structured decisions
+    "JsonValue",
+    "WekaAnswer",
+    "WekaChoiceAnswer",
+    "WekaChoiceQuestion",
+    "WekaClient",
+    "WekaDecisionRequest",
+    "WekaDecisionResponse",
+    "WekaDescription",
+    "WekaNoulAnswer",
+    "WekaNoulCriteria",
+    "WekaNoulQuestion",
+    "WekaQuestion",
+    "WekaRequestError",
+    "WekaScoreAnswer",
+    "WekaScoreQuestion",
+    "WekaUsage",
+    "WekaValidationError",
     # Abort types
     "AbortParams",
     "AbortResult",
@@ -290,6 +308,25 @@ _ERROR_EXPORTS = {
     "RPCError",
     "TransportError",
     "TransportNotStartedError",
+    "WekaRequestError",
+    "WekaValidationError",
+}
+_WEKA_EXPORTS = {
+    "JsonValue",
+    "WekaAnswer",
+    "WekaChoiceAnswer",
+    "WekaChoiceQuestion",
+    "WekaClient",
+    "WekaDecisionRequest",
+    "WekaDecisionResponse",
+    "WekaDescription",
+    "WekaNoulAnswer",
+    "WekaNoulCriteria",
+    "WekaNoulQuestion",
+    "WekaQuestion",
+    "WekaScoreAnswer",
+    "WekaScoreQuestion",
+    "WekaUsage",
 }
 _EXPORT_MODULES = {
     name: "autohand_sdk.types"
@@ -313,6 +350,7 @@ _EXPORT_MODULES.update(
         "AutohandSDK": "autohand_sdk.sdk",
         "RPCClient": "autohand_sdk.rpc_client",
         "Transport": "autohand_sdk.transport",
+        **dict.fromkeys(_WEKA_EXPORTS, "autohand_sdk.weka"),
         **dict.fromkeys(_ERROR_EXPORTS, "autohand_sdk.errors"),
     }
 )
