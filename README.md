@@ -34,6 +34,7 @@ The Agent SDK is available in multiple beta language packages. Use the same CLI-
 - **Replayable autoresearch** - Typed lifecycle, history, replay, rescore, compare, Pareto, pin, and prune APIs
 - **Automatic cleanup** - Context manager support for resource management
 - **Production transport** - Response matching, notification routing, timeouts, and typed RPC errors
+- **Weka decisions** - Typed, validated `noul`, `choice`, and `score` requests over the Autohand API
 - **85% coverage gate** - Subprocess-backed transport and streaming tests
 
 ## Installation
@@ -72,6 +73,56 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## Weka structured decisions
+
+`WekaClient` calls the Autohand decision API directly and does not start a CLI
+subprocess. It reads `AUTOHAND_AI_API_KEY` or `AUTOHAND_API_KEY` by default:
+
+```python
+import asyncio
+
+from autohand_sdk import (
+    WekaChoiceQuestion,
+    WekaClient,
+    WekaDecisionRequest,
+    WekaScoreQuestion,
+)
+
+
+async def decide_release() -> None:
+    request = WekaDecisionRequest(
+        state={"tests": "passed", "changed_systems": ["checkout"]},
+        questions={
+            "release_lane": WekaChoiceQuestion(
+                instructions="Choose the safest release lane.",
+                criteria={
+                    "stable": "Healthy checks and low expected impact.",
+                    "canary": "Healthy checks with elevated impact.",
+                    "blocked": "A required check failed.",
+                },
+            ),
+            "risk": WekaScoreQuestion(
+                instructions="Score release risk against the ordered anchors.",
+                criteria=["Low risk", "Material risk", "Severe risk"],
+            ),
+        },
+    )
+
+    async with WekaClient() as weka:
+        result = await weka.decide(request)
+
+    print(result.answers["release_lane"])
+    print(result.answers["risk"])
+
+
+asyncio.run(decide_release())
+```
+
+The client validates the response against the questions that were sent.
+Unknown choices, missing answers, invalid probabilities, and malformed usage
+data raise `WekaRequestError`. Invalid input raises `WekaValidationError`
+before a network call.
 
 ## Skills API
 

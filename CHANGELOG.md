@@ -4,6 +4,9 @@
 
 ### Added
 
+- A typed async `WekaClient` for structured `noul`, `choice`, and `score`
+  decisions through `/v1/decisions`, with Pydantic validation and safe HTTP
+  errors.
 - Lazy `Agent.send/run/stream/json` runs with replayable events, repeatable results,
   and cancellation scoped to an individual run.
 - Sync/async `stop_when` predicates, `is_step_count`, `has_tool_call`, validated

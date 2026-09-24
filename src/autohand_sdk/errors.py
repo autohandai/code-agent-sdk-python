@@ -36,3 +36,22 @@ class RPCError(AutohandSDKError):
 
 class RequestTimeoutError(TransportError, TimeoutError):
     """Raised when a JSON-RPC request does not receive a response in time."""
+
+
+class WekaValidationError(AutohandSDKError, ValueError):
+    """Raised when a Weka client option or decision request is invalid."""
+
+
+class WekaRequestError(AutohandSDKError):
+    """Raised when a Weka HTTP request or response cannot be accepted."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: int | None = None,
+        request_id: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status = status
+        self.request_id = request_id
