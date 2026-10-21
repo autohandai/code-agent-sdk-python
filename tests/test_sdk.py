@@ -132,6 +132,7 @@ class TestSDKLifecycle:
         # Mock the entire client to avoid subprocess creation
         with patch("autohand_sdk.sdk.RPCClient") as MockClient:
             mock_instance = AsyncMock()
+            mock_instance.on_notification = MagicMock()
             mock_instance._started = True
             mock_instance.is_running = MagicMock(return_value=True)
             MockClient.return_value = mock_instance
@@ -142,9 +143,10 @@ class TestSDKLifecycle:
             assert sdk._started
 
     @pytest.mark.asyncio
-    async def test_start_applies_feature_settings(self) -> None:
+    async def test_start_does_not_replace_merged_startup_features(self) -> None:
         with patch("autohand_sdk.sdk.RPCClient") as mock_client_class:
             mock_client = AsyncMock()
+            mock_client.on_notification = MagicMock()
             mock_client._started = True
             mock_client.is_running = MagicMock(return_value=True)
             mock_client_class.return_value = mock_client
@@ -158,9 +160,7 @@ class TestSDKLifecycle:
             await sdk.start()
 
         mock_client.start.assert_awaited_once()
-        mock_client.apply_flag_settings.assert_awaited_once_with(
-            {"features": {"slashGoal": True, "experimentalFork": True}}
-        )
+        mock_client.apply_flag_settings.assert_not_awaited()
         assert sdk._started
 
     @pytest.mark.asyncio
@@ -178,6 +178,7 @@ class TestSDKLifecycle:
     async def test_start_rebuilds_client_if_skills_changed(self) -> None:
         with patch("autohand_sdk.sdk.RPCClient") as MockClient:
             mock_instance = AsyncMock()
+            mock_instance.on_notification = MagicMock()
             mock_instance.is_running = MagicMock(return_value=False)
             MockClient.return_value = mock_instance
             sdk = AutohandSDK()

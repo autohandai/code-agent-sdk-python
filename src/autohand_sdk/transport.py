@@ -15,18 +15,36 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pydantic import JsonValue
+
+from autohand_sdk.cli_compatibility import validate_cli_arguments
 from autohand_sdk.errors import (
     RequestTimeoutError,
     RPCError,
     TransportError,
     TransportNotStartedError,
 )
+from autohand_sdk.runtime_settings import build_runtime_settings, needs_runtime_settings
+from autohand_sdk.wire import NotificationObservers, WireNotification
 
 logger = logging.getLogger(__name__)
 
 JsonDict = dict[str, Any]
 NotificationCallback = Callable[[JsonDict], None]
 TerminationCallback = Callable[[BaseException], None]
+
+
+class NotificationParams(dict[str, Any]):
+    """Legacy dictionary callback payload with the exact original JSON retained."""
+
+    def __init__(self, method: str, raw_params: Any) -> None:
+        values = (
+            raw_params
+            if isinstance(raw_params, dict)
+            else ({"value": raw_params} if raw_params is not None else {})
+        )
+        super().__init__({**values, "_method": method})
+        self.raw_params = raw_params
 
 
 @dataclass
@@ -67,6 +85,7 @@ class TransportOptions:
     permission_mode: str | None = None
     permission_allow_list: list[str] = field(default_factory=list)
     permission_deny_list: list[str] = field(default_factory=list)
+    ephemeral: bool = False
     persist_session: bool | None = None
     session_id: str | None = None
     resume: bool | None = None
@@ -88,6 +107,19 @@ class TransportOptions:
     base_url: str | None = None
     autohand_ai_plan: str | None = None
     env_vars: dict[str, str] = field(default_factory=dict)
+    features: dict[str, JsonValue] | None = None
+    run_settings: dict[str, JsonValue] | None = None
+    port: int | None = None
+    openai_auth_mode: str | None = None
+    chatgpt_access_token: str | None = None
+    chatgpt_account_id: str | None = None
+    azure_auth_method: str | None = None
+    azure_tenant_id: str | None = None
+    azure_client_id: str | None = None
+    azure_client_secret: str | None = None
+    azure_resource_name: str | None = None
+    azure_deployment_name: str | None = None
+    azure_api_version: str | None = None
 
 
 class Transport:
@@ -99,6 +131,7 @@ class Transport:
         self._callbacks: dict[int, asyncio.Future[JsonDict]] = {}
         self._notification_callbacks: dict[str, list[NotificationCallback]] = defaultdict(list)
         self._termination_callbacks: list[TerminationCallback] = []
+        self._wire_observers = NotificationObservers()
         self._request_id = 0
         self._running = False
         self._stdout_task: asyncio.Task[None] | None = None
@@ -122,13 +155,13 @@ class Transport:
 
     async def _start_process(self) -> None:
         """Start one process while the lifecycle lock is held."""
+        runtime_settings = build_runtime_settings(self.options)
         cli_path = self.options.cli_path or self._detect_cli_binary()
         cwd = self.options.cwd or str(Path.cwd())
 
-        if self.options.copy_skill_files and (self.options.skills or self.options.skill_files):
-            await self._copy_skill_files(cwd)
-
         args = [cli_path, "--mode", "rpc"]
+        if self.options.ephemeral:
+            args.append("--ephemeral")
         if self.options.bare:
             args.append("--bare")
         if self.options.unrestricted:
@@ -138,25 +171,21 @@ class Transport:
         if self.options.auto_skill:
             args.append("--auto-skill")
         if self.options.auto_commit:
-            args.append("-c")
+            args.append("--auto-commit")
         if self.options.idle_logout is False:
             args.append("--no-idle-logout")
         if self.options.context_compact is False:
             args.append("--no-context-compact")
         elif self.options.context_compact is True:
             args.append("--context-compact")
-        if self.options.persist_session:
-            args.append("--persist-session")
-        if self.options.session_id:
-            args.extend(["--session-id", self.options.session_id])
-        if self.options.resume:
-            args.append("--resume")
-        if self.options.continue_session:
-            args.append("--continue")
         if self.options.fork:
             args.extend(["--fork", self.options.fork])
-        if self.options.session_path:
-            args.extend(["--session-path", self.options.session_path])
+        else:
+            reference = self.options.session_id or self.options.session_path
+            if reference is not None:
+                args.extend(["--sdk-session-reference", reference])
+            elif self.options.resume or self.options.continue_session:
+                args.append("--sdk-resume-last")
         if self.options.auto_save_interval is not None:
             args.extend(["--auto-save-interval", str(self.options.auto_save_interval)])
         if self.options.agents_md_enable is False:
@@ -216,15 +245,20 @@ class Transport:
         if self.options.yolo:
             args.extend(["--yolo", self.options.yolo])
         if self.options.yolo_timeout is not None:
-            args.extend(["--yolo-timeout", str(self.options.yolo_timeout)])
+            args.extend(["--timeout", str(self.options.yolo_timeout)])
         for directory in self.options.add_dir:
             args.extend(["--add-dir", directory])
+        validate_cli_arguments(args[1:])
         args.extend(self.options.extra_args)
+
+        if self.options.copy_skill_files and (self.options.skills or self.options.skill_files):
+            await self._copy_skill_files(cwd)
 
         env = dict(os.environ)
         env["AUTOHAND_STREAM_TOOL_OUTPUT"] = "1"
         if self.options.provider == "autohandai":
-            env["AUTOHAND_AI_PLAN"] = self.options.autohand_ai_plan or "cloud"
+            if self.options.autohand_ai_plan is not None:
+                env["AUTOHAND_AI_PLAN"] = self.options.autohand_ai_plan
             if self.options.api_key:
                 env["AUTOHAND_AI_API_KEY"] = self.options.api_key
             if self.options.base_url:
@@ -232,6 +266,11 @@ class Transport:
         env.update(self.options.env_vars)
         if self.options.provider is not None:
             env["AUTOHAND_PROVIDER"] = self.options.provider
+
+        if needs_runtime_settings(self.options):
+            env["AUTOHAND_RUN_SETTINGS"] = json.dumps(runtime_settings, allow_nan=False)
+        if "AUTOHAND_RUN_SETTINGS" in env:
+            args.extend(["--sdk-settings-version", "1"])
 
         self._stderr_lines.clear()
         process = await asyncio.create_subprocess_exec(
@@ -358,6 +397,12 @@ class Transport:
                 data=error.get("data"),
             )
         return response.get("result")
+
+    def observe_notifications(
+        self, callback: Callable[[WireNotification], None]
+    ) -> Callable[[], None]:
+        """Observe all raw packets alongside existing method-specific callbacks."""
+        return self._wire_observers.subscribe(callback)
 
     def on_notification(self, method: str, callback: NotificationCallback) -> Callable[[], None]:
         """Register a notification callback.
@@ -527,9 +572,8 @@ class Transport:
             return
 
         params = message.get("params")
-        if not isinstance(params, dict):
-            params = {"value": params} if params is not None else {}
-        params = {**params, "_method": method}
+        self._wire_observers.dispatch(WireNotification(method, params))
+        params = NotificationParams(method, params)
 
         callbacks = [
             *self._notification_callbacks.get(method, []),

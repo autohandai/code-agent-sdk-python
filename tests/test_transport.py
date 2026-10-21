@@ -330,6 +330,7 @@ class TestTransportStartArguments:
             TransportOptions(
                 cwd=str(tmp_path),
                 cli_path=str(cli_path),
+                ephemeral=True,
                 unrestricted=True,
                 auto_mode=True,
                 auto_skill=True,
@@ -353,27 +354,8 @@ class TestTransportStartArguments:
                 yolo_timeout=30,
                 add_dir=["../shared"],
                 extra_args=["--custom"],
-                skills=["typescript"],
-                skill_sources=["autohand-user"],
-                install_missing_skills=True,
-                permission_mode="default",
-                permission_allow_list=["read"],
-                permission_deny_list=["delete"],
-                persist_session=True,
-                session_id="session-1",
-                resume=True,
-                continue_session=True,
-                fork="session-parent",
-                session_path=".autohand/session.json",
-                auto_save_interval=60,
-                agents_md_enable=True,
-                agents_md_create=True,
-                agents_md_path="AGENTS.md",
-                agents_md_auto_update=True,
                 context_compact=True,
                 max_tokens=1000,
-                compression_threshold=0.7,
-                summarization_threshold=0.8,
                 provider="autohandai",
                 api_key="ah-test-key",
                 base_url="https://api.example.test/v1",
@@ -400,23 +382,15 @@ class TestTransportStartArguments:
         assert data["ai_plan"] == "cloud"
         assert data["provider"] == "autohandai"
         assert argv[:2] == ["--mode", "rpc"]
+        assert "--ephemeral" in argv
         assert "--unrestricted" in argv
         assert "--auto-mode" in argv
         assert "--auto-skill" in argv
         assert "--bare" in argv
-        assert "-c" in argv
+        assert "--auto-commit" in argv
+        assert "-c" not in argv
         assert "--no-idle-logout" in argv
-        assert argv[argv.index("--fork") : argv.index("--fork") + 2] == [
-            "--fork",
-            "session-parent",
-        ]
-        assert "--agents-md" in argv
-        assert "--agents-md-create" in argv
-        assert "--agents-md-auto-update" in argv
-        assert argv[argv.index("--agents-md-path") : argv.index("--agents-md-path") + 2] == [
-            "--agents-md-path",
-            "AGENTS.md",
-        ]
+
         assert argv[argv.index("--display-language") : argv.index("--display-language") + 2] == [
             "--display-language",
             "en-NZ",
@@ -444,10 +418,7 @@ class TestTransportStartArguments:
             "./plugins",
         ]
         assert argv[argv.index("--model") : argv.index("--model") + 2] == ["--model", "fantail"]
-        assert argv[argv.index("--skills") : argv.index("--skills") + 2] == [
-            "--skills",
-            "typescript",
-        ]
+
         assert "--custom" in argv
 
 

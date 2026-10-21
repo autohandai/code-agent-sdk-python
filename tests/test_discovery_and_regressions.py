@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from textwrap import dedent
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -147,7 +147,8 @@ async def test_plan_mode_is_applied_and_failed_start_rolls_back() -> None:
     """Documented plan mode is sent, and later config failure stops the CLI."""
     with patch("autohand_sdk.sdk.RPCClient") as client_class:
         client = AsyncMock()
-        client.apply_flag_settings.side_effect = RuntimeError("apply failed")
+        client.on_notification = MagicMock()
+        client.set_plan_mode.side_effect = RuntimeError("apply failed")
         client_class.return_value = client
         sdk = AutohandSDK(plan_mode=True, features={"slashGoal": True})
 

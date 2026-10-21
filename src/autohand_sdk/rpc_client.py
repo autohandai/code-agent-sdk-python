@@ -10,7 +10,7 @@ from contextlib import suppress
 from typing import Any, Literal, cast
 
 from autohand_sdk.errors import TransportError
-from autohand_sdk.transport import Transport, TransportOptions
+from autohand_sdk.transport import NotificationParams, Transport, TransportOptions
 from autohand_sdk.types import (
     AgentStep,
     SDKConfig,
@@ -24,6 +24,7 @@ from autohand_sdk.types import (
     parse_sdk_wire_event,
     validate_provider_config,
 )
+from autohand_sdk.wire import WireNotification
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ RPC_METHODS = {
     "get_messages": "autohand.getMessages",
     "get_supported_models": "autohand.getSupportedModels",
     "get_supported_commands": "autohand.getSupportedCommands",
+    "get_supported_agents": "autohand.getSupportedAgents",
     "get_skills_registry": "autohand.getSkillsRegistry",
     "install_skill": "autohand.installSkill",
     "set_model": "autohand.modelSet",
@@ -211,12 +213,18 @@ class RPCClient:
         self._termination_callback = termination_callback
 
         if self.config.provider is not None:
-            validate_provider_config(self.config.provider, self.config)
+            validate_provider_config(self.config.provider, self.config, allow_inherited_config=True)
 
         opts = self._build_transport_options()
         self._transport = Transport(opts)
         self._transport.on_notification("*", self._handle_notification)
         self._transport.on_termination(self._handle_termination)
+
+    def on_notification(self, callback: Callable[[WireNotification], None]) -> Callable[[], None]:
+        """Observe complete CLI packets independently of typed event streams."""
+        if self._transport is None:
+            raise RuntimeError("RPC transport is not initialized")
+        return self._transport.observe_notifications(callback)
 
     async def start(self) -> None:
         """Start the RPC client."""
@@ -734,6 +742,10 @@ class RPCClient:
         """Get supported models."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_supported_models"], {}))
 
+    async def get_supported_agents(self) -> dict[str, Any]:
+        """Return effective subagent metadata from the running CLI."""
+        return cast(dict[str, Any], await self._request(RPC_METHODS["get_supported_agents"], {}))
+
     async def get_agents(self) -> dict[str, Any]:
         """Get supported command names.
 
@@ -791,6 +803,67 @@ class RPCClient:
         """Set the active model."""
         return cast(dict[str, Any], await self._request(RPC_METHODS["set_model"], {"model": model}))
 
+    async def set_browser_capabilities(
+        self, protocol_version: int, extension_version: str, tools: list[str]
+    ) -> dict[str, object]:
+        """Negotiate browser extension capabilities."""
+        return cast(
+            dict[str, object],
+            await self._request(
+                "autohand.browserCapabilities.set",
+                {
+                    "protocolVersion": protocol_version,
+                    "extensionVersion": extension_version,
+                    "tools": tools,
+                },
+            ),
+        )
+
+    async def set_permission_mode(self, mode: str) -> dict[str, object]:
+        """Change the live permission mode."""
+        return cast(
+            dict[str, object], await self._request("autohand.permissionModeSet", {"mode": mode})
+        )
+
+    async def set_max_thinking_tokens(self, max_thinking_tokens: int | None) -> dict[str, object]:
+        """Set or clear the thinking-token limit."""
+        return cast(
+            dict[str, object],
+            await self._request(
+                "autohand.maxThinkingTokensSet", {"maxThinkingTokens": max_thinking_tokens}
+            ),
+        )
+
+    async def get_context_usage(self) -> dict[str, object]:
+        """Read context usage from the CLI."""
+        return cast(dict[str, object], await self._request("autohand.getContextUsage", {}))
+
+    async def reload_plugins(self) -> dict[str, object]:
+        """Reload the configured legacy plugins."""
+        return cast(dict[str, object], await self._request("autohand.reloadPlugins", {}))
+
+    async def toggle_mcp_server(self, server_name: str, enabled: bool) -> dict[str, object]:
+        """Enable or disable an MCP server."""
+        return cast(
+            dict[str, object],
+            await self._request(
+                "autohand.mcp.toggleServer", {"serverName": server_name, "enabled": enabled}
+            ),
+        )
+
+    async def reconnect_mcp_server(self, server_name: str) -> dict[str, object]:
+        """Reconnect an MCP server."""
+        return cast(
+            dict[str, object],
+            await self._request("autohand.mcp.reconnectServer", {"serverName": server_name}),
+        )
+
+    async def set_mcp_servers(self, servers: dict[str, object]) -> dict[str, object]:
+        """Replace live MCP server configurations."""
+        return cast(
+            dict[str, object], await self._request("autohand.mcp.setServers", {"servers": servers})
+        )
+
     async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
         """Enable or disable plan mode."""
         return cast(
@@ -830,9 +903,10 @@ class RPCClient:
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_account_info"], {}))
 
     async def save_session(self) -> dict[str, Any]:
-        """Return state after asking the CLI to persist sessions via startup flags.
+        """Return state for the current CLI session.
 
-        The current CLI does not expose a dedicated save-session RPC method.
+        The CLI persists automatically unless ephemeral is enabled. This compatibility
+        helper does not force a save; there is no dedicated save-session RPC method.
         """
         return cast(dict[str, Any], await self._request(RPC_METHODS["get_state"], {}))
 
@@ -954,6 +1028,7 @@ class RPCClient:
             add_dir=self._merge_lists(self.config.add_dir, self.config.additional_directories),
             extra_args=self.config.extra_args or [],
             permission_mode=self.config.permission_mode,
+            ephemeral=self.config.ephemeral,
             persist_session=self.config.persist_session,
             session_id=self.config.session_id,
             resume=self.config.resume,
@@ -965,9 +1040,26 @@ class RPCClient:
             api_key=self.config.api_key,
             base_url=self.config.base_url,
             autohand_ai_plan=self.config.autohand_ai_plan,
+            features=self.config.features.model_dump(by_alias=True, exclude_none=True)
+            if self.config.features is not None
+            else None,
+            run_settings=self.config.run_settings,
+            port=self.config.port,
+            openai_auth_mode=self.config.openai_auth_mode,
+            chatgpt_access_token=self.config.chatgpt_access_token,
+            chatgpt_account_id=self.config.chatgpt_account_id,
+            azure_auth_method=self.config.azure_auth_method,
+            azure_tenant_id=self.config.azure_tenant_id,
+            azure_client_id=self.config.azure_client_id,
+            azure_client_secret=self.config.azure_client_secret,
+            azure_resource_name=self.config.azure_resource_name,
+            azure_deployment_name=self.config.azure_deployment_name,
+            azure_api_version=self.config.azure_api_version,
         )
 
         if self.config.session:
+            if self.config.session.ephemeral is not None:
+                opts.ephemeral = self.config.session.ephemeral
             if self.config.session.persist_session is not None:
                 opts.persist_session = self.config.session.persist_session
             if self.config.session.session_id is not None:
@@ -1062,7 +1154,11 @@ class RPCClient:
 
         event_type = NOTIFICATION_EVENT_TYPES.get(method)
         if event_type is None:
-            raw_params = {key: value for key, value in params.items() if key != "_method"}
+            raw_params = (
+                params.raw_params
+                if isinstance(params, NotificationParams)
+                else {key: value for key, value in params.items() if key != "_method"}
+            )
             self._publish_event(
                 {
                     "type": "unknown_notification",

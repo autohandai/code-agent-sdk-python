@@ -51,6 +51,7 @@ from autohand_sdk.types import (
     VscodeMcpToolDescriptor,
     YoloSetResult,
 )
+from autohand_sdk.wire import WireNotification
 
 T = TypeVar("T")
 
@@ -76,6 +77,10 @@ class Agent:
     def from_sdk(cls, sdk: AutohandSDK) -> Agent:
         """Wrap an existing low-level SDK instance."""
         return cls(sdk)
+
+    def on_notification(self, callback: Callable[[WireNotification], None]) -> Callable[[], None]:
+        """Observe complete CLI packets alongside typed run events."""
+        return self._sdk.on_notification(callback)
 
     def send(self, message: str | PromptParams, **kwargs: Any) -> Run:
         """Create a lazy run, preserving validated prompt options and host callbacks."""
@@ -364,6 +369,40 @@ class Agent:
     async def get_mcp_server_configs(self) -> McpGetServerConfigsResult:
         """Return MCP server configurations."""
         return await self._sdk.get_mcp_server_configs()
+
+    async def set_browser_capabilities(
+        self, protocol_version: int, extension_version: str, tools: list[str]
+    ) -> dict[str, object]:
+        """Negotiate browser extension capabilities."""
+        return await self._sdk.set_browser_capabilities(protocol_version, extension_version, tools)
+
+    async def set_permission_mode(self, mode: str) -> dict[str, object]:
+        """Change the live permission mode."""
+        return await self._sdk.set_permission_mode(mode)
+
+    async def set_max_thinking_tokens(self, max_thinking_tokens: int | None) -> dict[str, object]:
+        """Set or clear the thinking-token limit."""
+        return await self._sdk.set_max_thinking_tokens(max_thinking_tokens)
+
+    async def get_context_usage(self) -> dict[str, object]:
+        """Read context usage from the CLI."""
+        return await self._sdk.get_context_usage()
+
+    async def reload_plugins(self) -> dict[str, object]:
+        """Reload the configured legacy plugins."""
+        return await self._sdk.reload_plugins()
+
+    async def toggle_mcp_server(self, server_name: str, enabled: bool) -> dict[str, object]:
+        """Enable or disable an MCP server."""
+        return await self._sdk.toggle_mcp_server(server_name, enabled)
+
+    async def reconnect_mcp_server(self, server_name: str) -> dict[str, object]:
+        """Reconnect an MCP server."""
+        return await self._sdk.reconnect_mcp_server(server_name)
+
+    async def set_mcp_servers(self, servers: dict[str, object]) -> dict[str, object]:
+        """Replace live MCP server configurations."""
+        return await self._sdk.set_mcp_servers(servers)
 
     async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
         """Enable or disable plan mode."""

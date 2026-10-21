@@ -11,7 +11,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic.json_schema import SkipJsonSchema
 
 MIN_TEMPERATURE = 0.0
@@ -202,16 +210,22 @@ class ProviderConfigError(Exception):
     pass
 
 
-def validate_provider_config(provider: ProviderName, config: SDKConfig) -> None:
+def validate_provider_config(
+    provider: ProviderName, config: SDKConfig, *, allow_inherited_config: bool = False
+) -> None:
     """Validate provider-specific configuration.
 
     Args:
         provider: The provider to validate configuration for.
         config: The SDK configuration to validate.
+        allow_inherited_config: Allow omitted credentials to come from saved CLI settings.
 
     Raises:
         ProviderConfigError: If the configuration is invalid for the provider.
     """
+    if allow_inherited_config:
+        return
+
     if provider == ProviderName.AZURE:
         if not config.azure_resource_name:
             raise ProviderConfigError("Azure provider requires 'azure_resource_name' configuration")
@@ -407,7 +421,10 @@ class SessionSettings(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    persist_session: bool | None = Field(None, description="Persist session to disk")
+    ephemeral: bool | None = Field(None, description="Keep this run out of session history")
+    persist_session: bool | None = Field(
+        None, description="Legacy compatibility; use ephemeral to disable persistence"
+    )
     session_id: str | None = Field(None, description="Session ID to resume")
     resume: bool | None = Field(None, description="Resume from last session")
     continue_: bool | None = Field(None, alias="continue", description="Continue from last session")
@@ -521,6 +538,27 @@ class AgentInfo(BaseModel):
     name: str
     description: str | None = None
     version: str = "1.0.0"
+
+
+class SupportedAgentInfo(AgentInfo):
+    """An effective subagent returned by the running CLI registry."""
+
+    model_config = ConfigDict(populate_by_name=True, strict=True)
+
+    id: str
+    description: str
+    tools: list[str]
+    model: str | None = None
+    source: str | None = None
+    extension_id: str | None = Field(None, alias="extensionId")
+    extension_version: str | None = Field(None, alias="extensionVersion")
+    extension_scope: Literal["user", "project"] | None = Field(None, alias="extensionScope")
+
+
+class GetSupportedAgentsResult(BaseModel):
+    """The initialized session's effective agent registry."""
+
+    agents: list[SupportedAgentInfo]
 
 
 class AccountInfo(BaseModel):
@@ -2414,6 +2452,11 @@ class SDKConfig(BaseModel):
         None, description="Autohand AI plan style"
     )
 
+    run_settings: dict[str, JsonValue] | None = Field(
+        None, description="Run-only native CLI provider, feature and session-awareness settings"
+    )
+    azure_api_version: str | None = Field(None, description="Azure API version")
+
     # OpenAI-specific options
     openai_auth_mode: Literal["api-key", "chatgpt"] | None = Field(
         None, description="OpenAI authentication mode"
@@ -2500,7 +2543,12 @@ class SDKConfig(BaseModel):
 
     # Session configuration
     session: SessionSettings | None = Field(None, description="Session settings")
-    persist_session: bool | None = Field(None, description="Persist session to disk (legacy)")
+    ephemeral: bool = Field(
+        False, description="Keep this run out of session history and synchronization"
+    )
+    persist_session: bool | None = Field(
+        None, description="Legacy compatibility; use ephemeral to disable persistence"
+    )
     session_id: str | None = Field(None, description="Session ID to resume (legacy)")
     resume: bool | None = Field(None, description="Resume from last session (legacy)")
     continue_: bool | None = Field(
