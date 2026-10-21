@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import aclosing, suppress
 from typing import Any, Literal, cast
 
@@ -68,6 +68,7 @@ from autohand_sdk.types import (
     GetSkillsRegistryResult,
     GetStateParams,
     GetStateResult,
+    GetSupportedAgentsResult,
     GetToolsRegistryResult,
     GoalFeatureDisabledResult,
     GoalMutationResult,
@@ -102,6 +103,7 @@ from autohand_sdk.types import (
     SetContextCompactParams,
     SetContextCompactResult,
     SkillReference,
+    SupportedAgentInfo,
     TypedSDKEvent,
     UpdateGoalParams,
     VscodeMcpToolDescriptor,
@@ -109,6 +111,7 @@ from autohand_sdk.types import (
     YoloSetResult,
     parse_sdk_event,
 )
+from autohand_sdk.wire import NotificationObservers, WireNotification
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +135,7 @@ class AutohandSDK:
             config_data.update(kwargs)
             config = SDKConfig.model_validate(config_data)
 
+        self._wire_observers = NotificationObservers()
         self._config = config
         self._client: RPCClient | None = None
         self._started = False
@@ -150,6 +154,11 @@ class AutohandSDK:
             self._config,
             termination_callback=self._handle_client_termination,
         )
+        self._client.on_notification(self._wire_observers.dispatch)
+
+    def on_notification(self, callback: Callable[[WireNotification], None]) -> Callable[[], None]:
+        """Observe exact CLI packets; subscriptions survive client rebuilds."""
+        return self._wire_observers.subscribe(callback)
 
     @property
     def config(self) -> SDKConfig:
@@ -187,6 +196,7 @@ class AutohandSDK:
             self._config,
             termination_callback=self._handle_client_termination,
         )
+        self._client.on_notification(self._wire_observers.dispatch)
 
     async def start(self) -> None:
         """Start the SDK.
@@ -220,19 +230,11 @@ class AutohandSDK:
                     termination_callback=self._handle_client_termination,
                 )
                 self._client = client
+                client.on_notification(self._wire_observers.dispatch)
 
             await client.start()
             if self._config.plan_mode is not None:
                 await client.set_plan_mode(self._config.plan_mode)
-            if self._config.features is not None:
-                await client.apply_flag_settings(
-                    {
-                        "features": self._config.features.model_dump(
-                            by_alias=True,
-                            exclude_none=True,
-                        )
-                    }
-                )
             if not client._started or not client.is_running():
                 raise TransportError("CLI transport stopped during post-start configuration")
             self._started = True
@@ -714,6 +716,13 @@ class AutohandSDK:
         agents = result.get("agents", result.get("commands", []))
         return cast(list[dict[str, Any]], agents)
 
+    async def supported_agents(self) -> list[SupportedAgentInfo]:
+        """Return effective subagents, including inline and enabled extension agents."""
+        if not self._started or not self._client:
+            raise RuntimeError("SDK not started")
+        result = await self._client.get_supported_agents()
+        return GetSupportedAgentsResult.model_validate(result).agents
+
     async def get_skills_registry(
         self,
         force_refresh: bool | None = None,
@@ -830,6 +839,58 @@ class AutohandSDK:
         self._config = self._config.model_copy(update={"model": model})
 
         return await self._client.set_model(model)
+
+    async def set_browser_capabilities(
+        self, protocol_version: int, extension_version: str, tools: list[str]
+    ) -> dict[str, object]:
+        """Negotiate browser extension capabilities."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.set_browser_capabilities(
+            protocol_version, extension_version, tools
+        )
+
+    async def set_permission_mode(self, mode: str) -> dict[str, object]:
+        """Change the live permission mode."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.set_permission_mode(mode)
+
+    async def set_max_thinking_tokens(self, max_thinking_tokens: int | None) -> dict[str, object]:
+        """Set or clear the thinking-token limit."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.set_max_thinking_tokens(max_thinking_tokens)
+
+    async def get_context_usage(self) -> dict[str, object]:
+        """Read context usage from the CLI."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.get_context_usage()
+
+    async def reload_plugins(self) -> dict[str, object]:
+        """Reload the configured legacy plugins."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.reload_plugins()
+
+    async def toggle_mcp_server(self, server_name: str, enabled: bool) -> dict[str, object]:
+        """Enable or disable an MCP server."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.toggle_mcp_server(server_name, enabled)
+
+    async def reconnect_mcp_server(self, server_name: str) -> dict[str, object]:
+        """Reconnect an MCP server."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.reconnect_mcp_server(server_name)
+
+    async def set_mcp_servers(self, servers: dict[str, object]) -> dict[str, object]:
+        """Replace live MCP server configurations."""
+        if not self._client:
+            raise RuntimeError("SDK not started")
+        return await self._client.set_mcp_servers(servers)
 
     async def set_plan_mode(self, enabled: bool) -> dict[str, Any]:
         """Enable or disable plan mode for the live CLI session."""

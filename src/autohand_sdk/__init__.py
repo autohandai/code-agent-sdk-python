@@ -54,6 +54,7 @@ __all__ = [
     "StopWhen",
     "is_step_count",
     "has_tool_call",
+    "WireNotification",
     "RPCClient",
     "Transport",
     "AutohandSDKError",
@@ -274,6 +275,8 @@ __all__ = [
     # Model types
     "ModelInfo",
     "AgentInfo",
+    "SupportedAgentInfo",
+    "GetSupportedAgentsResult",
     "AccountInfo",
     "McpServerConfig",
     # Weka structured decisions
@@ -350,6 +353,7 @@ _EXPORT_MODULES.update(
         "AutohandSDK": "autohand_sdk.sdk",
         "RPCClient": "autohand_sdk.rpc_client",
         "Transport": "autohand_sdk.transport",
+        "WireNotification": "autohand_sdk.wire",
         **dict.fromkeys(_WEKA_EXPORTS, "autohand_sdk.weka"),
         **dict.fromkeys(_ERROR_EXPORTS, "autohand_sdk.errors"),
     }
