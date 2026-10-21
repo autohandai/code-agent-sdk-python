@@ -52,7 +52,7 @@ Common keyword arguments:
 - `auto_mode`: start CLI with `--auto-mode`.
 - `unrestricted`: start CLI with `--unrestricted`.
 - `bare`: start the minimal explicit runtime with `--bare`.
-- `auto_commit`: enable `-c` automatic commits.
+- `auto_commit`: enable `--auto-commit` automatic commits.
 - `idle_logout`: set to `False` to pass `--no-idle-logout` for long-running agents.
 - `max_iterations`, `max_runtime`, `max_cost`: execution limits passed to the CLI.
 - `sys_prompt`, `system_prompt_file`, `append_sys_prompt`, `append_system_prompt_file`: system prompt controls.
