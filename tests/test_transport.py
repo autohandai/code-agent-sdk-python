@@ -387,7 +387,8 @@ class TestTransportStartArguments:
         assert "--auto-mode" in argv
         assert "--auto-skill" in argv
         assert "--bare" in argv
-        assert "-c" in argv
+        assert "--auto-commit" in argv
+        assert "-c" not in argv
         assert "--no-idle-logout" in argv
 
         assert argv[argv.index("--display-language") : argv.index("--display-language") + 2] == [

@@ -171,7 +171,7 @@ class Transport:
         if self.options.auto_skill:
             args.append("--auto-skill")
         if self.options.auto_commit:
-            args.append("-c")
+            args.append("--auto-commit")
         if self.options.idle_logout is False:
             args.append("--no-idle-logout")
         if self.options.context_compact is False:
